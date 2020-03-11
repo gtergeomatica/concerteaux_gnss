@@ -5,8 +5,10 @@
 from datetime import datetime, timedelta
 import urllib.request
 import wget
-import os
-
+import sys,os
+import logging
+import time
+import logging #levels are DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 
 #passi da fare
@@ -160,40 +162,50 @@ def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_fl
 
 
 # definisco il nome del file da scaricare
-Stazioni=['XXMG','CAMA','AIGI','BEAN','SAOR']
-
-day_of_year = datetime.utcnow().utctimetuple().tm_yday
-year=datetime.utcnow().utctimetuple().tm_year
-hour=datetime.utcnow().utctimetuple().tm_hour
-months=datetime.utcnow().utctimetuple().tm_mon
-days=datetime.utcnow().utctimetuple().tm_mday
-minutes=datetime.utcnow().utctimetuple().tm_min
 
 
+while True:
+    Stazioni=['XXMG','CAMA','AIGI','BEAN','SAOR']
 
-start_time='%04d%03d%02d00'%(year,day_of_year,hour) #i minuti li definisco io a mano tanto saranno sempre 00
-#print(start_time)
 
-#devo fare un flag per il datatype:
+    #operazione da fare per ogni stazione
+    logging.basicConfig(filename='./downloaded_raw_data/{0}/{0}_log.txt'.format(Stazioni[1]), level=logging.INFO,
+            format='%(asctime)s:%(levelname)s:%(message)s')
 
-# mettere il secondo boolean True per scaricare file binario o False per scaricare file RINEX
-obs=rinex302filename(Stazioni[1],start_time,60,30,'MO',False,True,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
-print(obs)
-
-# scarico il file
-
-# devo vedere utlimo file processato (faccio un file con ultima ora processata, oppure 5 file di log di cui leggo ultima riga)
-# fare differenza rispetto a ora, e capire quanti e quali file cercare (potrebbe essere sia che il mio script non abbia girato sia che il ricevitore non abbia mandato il dato)
-# cerco i file
-
-with open('{0}_log.txt'.format(Stazioni[1]), 'w') as logfile:
-    logfile.write('{}-{}-{} {}:{}   Start script for data download!'.format(year,months,days,hour,minutes))
+    day_of_year = datetime.utcnow().utctimetuple().tm_yday
+    year=datetime.utcnow().utctimetuple().tm_year
+    hour=datetime.utcnow().utctimetuple().tm_hour
+    months=datetime.utcnow().utctimetuple().tm_mon
+    days=datetime.utcnow().utctimetuple().tm_mday
+    minutes=datetime.utcnow().utctimetuple().tm_min
 
 
 
-obs_test='CAMA00ITA_R_20200711300_01H_31S.dat'
-url='https://www.gter.it/concerteaux_gnss/rawdata/{}/dati_orari/{}'.format(Stazioni[1],obs)
+    start_time='%04d%03d%02d00'%(year,day_of_year,hour-1) #i minuti li definisco io a mano tanto saranno sempre 00
+    #print(start_time)
 
-output_directory ='./download_raw_data/CAMA/'
-filename = wget.download(url, out=output_directory)
+    #devo fare un flag per il datatype:
+
+    # mettere il secondo boolean True per scaricare file binario o False per scaricare file RINEX
+    obs=rinex302filename(Stazioni[1],start_time,60,30,'MO',False,False,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
+    print(obs)
+
+    # scarico il file
+
+    # devo vedere utlimo file processato (faccio un file con ultima ora processata, oppure 5 file di log di cui leggo ultima riga)
+    # fare differenza rispetto a ora, e capire quanti e quali file cercare (potrebbe essere sia che il mio script non abbia girato sia che il ricevitore non abbia mandato il dato)
+    # cerco i file
+
+    try:
+        bs_test='CAMA00ITA_R_20200711300_01H_31S.dat'
+        url='https://www.gter.it/concerteaux_gnss/rawdata/{}/dati_orari/{}'.format(Stazioni[1],obs)
+        output_directory ='./downloaded_raw_data/CAMA/'
+        filename = wget.download(url, out=output_directory)
+        logging.info('Downloaded file {}'.format(obs))
+
+    except:
+        logging.warning('File {} NOT Downloaded'.format(obs))
+
+    time.sleep(120)
+
 
