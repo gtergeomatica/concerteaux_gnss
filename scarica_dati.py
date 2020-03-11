@@ -3,6 +3,9 @@
 # Lorenzo Benvenuto
 
 from datetime import datetime, timedelta
+import ftplib
+from credenziali import *
+
 
 #passi da fare
 
@@ -170,4 +173,6 @@ print(start_time)
 
 obs=rinex302filename(Stazioni[1],start_time,60,30,'MO',False,False,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
 print(obs)
-
+url='www.gter.it/concerteaux_gnss/rawdata/{}/dati_orari/{}'.format(Stazioni[1],obs)
+output_directory ='./'
+filename = wget.download(url, out=output_directory)
