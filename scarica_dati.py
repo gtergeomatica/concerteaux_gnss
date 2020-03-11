@@ -2,8 +2,7 @@
 # Copyleft Gter srl 2020
 # Lorenzo Benvenuto
 
-from datetime import datetime
-
+from datetime import datetime, timedelta
 
 #passi da fare
 
@@ -12,7 +11,7 @@ from datetime import datetime
 #1.1 per scaricare il dato bisogna comporre in automatico il suo nome (quindi nomenclatura RINEX 3.02)
 
 
-def rinex302filename(st_code):
+def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_flag,bin_flag,data_format,compression):
     '''function to dynamically define the filename in rinex 3.02 format)
 
     Needed parameters
@@ -33,7 +32,57 @@ def rinex302filename(st_code):
         DDD  – day of year,
         HHMM - Hour and minutes of day
 
+    4: FILE PERIOD (FP): format DDU
+        DD – file period 
+        U – units of file period.
+        Examples:
+        15M – 15 Minutes 
+        01H – 1 Hour
+        01D – 1 Day
+        01Y – 1 Year 
+        00U - Unspecified
+    
+    5: DATA FREQ (DF); format DDU
+        DD – data frequency 
+        U – units of data rate 
+        Examples:
+        XXS – Seconds,
+        XXM – Minutes,
+        XXH – Hours,
+        XXD – Days
+        XXU – Unspecified
 
+    6: DATA TYPE (DT); format DD (default value are MO for obs and MN for nav)
+        GO - GPS Obs.,
+        RO - GLONASS Obs., 
+        EO - Galileo Obs. 
+        JO - QZSS Obs., 
+        CO - BDS Obs., 
+        IO – IRNSS Obs., 
+        SO - SBAS Obs., 
+        MO Mixed Obs., 
+        GN - Nav. GPS, 
+        RN- Glonass Nav., 
+        EN- Galileo Nav., 
+        JN- QZSS Nav., 
+        CN- BDS Nav., 
+        IN – IRNSS Nav., 
+        SN- SBAS Nav., 
+        MN- Nav. All GNSS Constellations 
+        MM-Meteorological Observation 
+        Etc
+
+    7: FORMAT
+        Three character indicating the data format:
+        RINEX - rnx, 
+        Hatanaka Compressed RINEX – crx, 
+        ETC
+    
+    8: COMPRESSION
+        .zip
+        .gz
+        .tar.gz
+        etc
 
 '''
 
@@ -59,16 +108,51 @@ def rinex302filename(st_code):
     filename+='{}_'.format(DS)
 
     # START TIME
+    filename+='{}_'.format(ST)
+    
 
+    # FILE PERIOD
+    interval=timedelta(seconds=session_interval*60)
+
+    if interval.days != 0 and interval.seconds//3600 ==0:
+        FP='%02dD'%(interval.days)
+    elif interval.days == 0 and interval.seconds//3600 !=0:
+        FP='%02dH'%(interval.seconds//3600)
+    else:
+        FP='00U'
+
+    filename+='{}_'.format(FP)
+
+    # DATA FREQ
+    
+    freq=timedelta(seconds=obs_freq)
+    print(freq)
+    print((freq.seconds//60)%60,freq.seconds)
+    if freq.seconds!=0 and (freq.seconds//60)%60==0:
+        DF='%02dS'%(freq.seconds)
+    elif freq.seconds==0 and (freq.seconds//60)%60!=0:
+        DF='%02dM'%((freq.seconds//60)%60)
+    else:
+        DF='00U'
+
+    filename+='{}'.format(DF)
+
+    # DATA TYPE
+    if data_type_flag:
+        filename+='{}_'.format(data_type)
+        #parte per compressione
+    else:
+        if bin_flag:
+            filename+='.dat'
+        else:
+            filename+='_{}.{}'.format(data_format,compression)
+    
     return filename
-
 
 
 Stazioni=['XXMG','CAMA','AIGI','BEAN','SAOR']
 
 
-obs=rinex302filename(Stazioni[0])
-print(obs)
 # devo vedere utlimo file processato (faccio un file con ultima ora processata, oppure 5 file di log di cui leggo ultima riga)
 # fare differenza rispetto a ora, e capire quanti e quali file cercare (potrebbe essere sia che il mio script non abbia girato sia che il ricevitore non abbia mandato il dato)
 # cerco i file
@@ -77,4 +161,13 @@ year=datetime.utcnow().utctimetuple().tm_year
 hour=datetime.utcnow().utctimetuple().tm_hour
 #minutes=datetime.utcnow().utctimetuple().tm_min
 minutes=0 #li definisco io a mano tanto saranno sempre 00
-print(year,'%03d'%day_of_year,hour,'%02d'%minutes)
+start_time='%04d%03d%02d00'%(year,day_of_year,hour)
+print(start_time)
+
+#nome per stazione XXMG sessione oraria 
+
+#devo fare un flag per il datatype:
+
+obs=rinex302filename(Stazioni[1],start_time,60,30,'MO',False,False,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
+print(obs)
+
