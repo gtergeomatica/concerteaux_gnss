@@ -206,6 +206,6 @@ while True:
     except:
         logging.warning('File {} NOT Downloaded'.format(obs))
 
-    time.sleep(120)
+    time.sleep(3600)
 
 
