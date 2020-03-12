@@ -167,8 +167,8 @@ def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_fl
 while True:
     Stazioni=['XXMG','CAMA','AIGI','BEAN','SAOR']
 
-
     #operazione da fare per ogni stazione
+
     logging.basicConfig(filename='./downloaded_raw_data/{0}/{0}_log.txt'.format(Stazioni[1]), level=logging.INFO,
             format='%(asctime)s:%(levelname)s:%(message)s')
 
@@ -201,10 +201,10 @@ while True:
         url='https://www.gter.it/concerteaux_gnss/rawdata/{}/dati_orari/{}'.format(Stazioni[1],obs)
         output_directory ='./downloaded_raw_data/CAMA/'
         filename = wget.download(url, out=output_directory)
-        logging.info('Downloaded file {}'.format(obs))
+        logging.info('Downloaded file {}:0'.format(obs)) #0 ok
 
     except:
-        logging.warning('File {} NOT Downloaded'.format(obs))
+        logging.warning('File {} NOT Downloaded:1'.format(obs)) #1 errore
 
     time.sleep(3600)
 
