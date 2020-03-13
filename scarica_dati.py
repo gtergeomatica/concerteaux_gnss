@@ -196,8 +196,13 @@ while True:
     # fare differenza rispetto a ora, e capire quanti e quali file cercare (potrebbe essere sia che il mio script non abbia girato sia che il ricevitore non abbia mandato il dato)
     # cerco i file
 
+    with open ('./downloaded_raw_data/{0}/{0}_log.txt'.format(Stazioni[1]),'r') as logfile:
+        righe=logfile.readlines()
+    print(righe[-1])
+
     try:
         bs_test='CAMA00ITA_R_20200711300_01H_31S.dat'
+        
         url='https://www.gter.it/concerteaux_gnss/rawdata/{}/dati_orari/{}'.format(Stazioni[1],obs)
         output_directory ='./downloaded_raw_data/CAMA/'
         filename = wget.download(url, out=output_directory)
