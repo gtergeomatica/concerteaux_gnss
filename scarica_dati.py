@@ -214,3 +214,8 @@ while True:
     time.sleep(3600)
 
 
+#to do :
+# - implementare lettura e scrittura tabella 
+# - leggere ultimo file scaricato e scaricare tutti i file da li in giu'
+# - capire come mai ogni tanto non mandi i file binari (lanciare script sul 99 per un po di tempo)
+# - capire come fare a leggere tutti i file di una pagina web (e/o fare un ls del server ftp)
