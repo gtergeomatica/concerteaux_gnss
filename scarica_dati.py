@@ -11,7 +11,9 @@ import time
 import logging #levels are DEBUG, INFO, WARNING, ERROR, CRITICAL
 import psycopg2
 from credenziali import *
-
+import getopt
+import urllib.request
+import ftplib
 #passi da fare
 
 #1. controllare che il dato ci sia e nel caso scaricarlo. Se il dato non ci fosse scrivere su un file di log
@@ -164,14 +166,63 @@ def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_fl
 
 # definisco il nome del file da scaricare
 
+'''
+#operazione da fare per ogni stazione
+conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
+#autocommit
+conn.set_session(autocommit=True)
+cur = conn.cursor()
 
-print(ip,db,user,password,port)
+
+rinextest='20200760016'
+staz='BEAN'
+cod_dw_test=0
+
+query="INSERT INTO meteognss_ztd.log_dw_rawdata(rinex_data,staz,cod_dw) VALUES ('%s', '%s',%d);" %(rinextest,staz,cod_dw_test)
+        #print i,query
+cur.execute(query)
+
 sys.exit()
+'''
+interval = ''
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "hi:n", ["help", "interval="])
+except getopt.GetoptError:
+    print('scarica_dati.py -i <interval>')
+    sys.exit(2)
+for opt, arg in opts:
+    if opt == '-h':
+        print('noaa2postgresql_ftp.py -i <interval (day or hour)>')
+        sys.exit()
+    elif opt in ("-i", "--interval"):
+        interval = arg
+        
+if interval=='':
+    print('ERROR: specify an interval')
+    sys.exit()
+print(interval)
+    #quit()
+
+Stazioni=['XXMG','CAMA','AIGI','BEAN','SAOR']
 while True:
-    Stazioni=['XXMG','CAMA','AIGI','BEAN','SAOR']
+    
 
     #operazione da fare per ogni stazione
+    conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
+    #autocommit
+    conn.set_session(autocommit=True)
+    cur = conn.cursor()
+    query= "SELECT rinex_data from meteognss_ztd.log_dw_rawdata  where staz='{}' order by rinex_data desc limit 1".format(Stazioni[1])
+    try:
+        cur.execute(query)
+    except:
+        print('errore.... scrivo nel log?')
+    a=cur.fetchall()
+    last_rawfile=a[0][0]
+    print(last_rawfile)
 
+    
+    #definisco il file attuale da scaricare
     logging.basicConfig(filename='./downloaded_raw_data/{0}/{0}_log.txt'.format(Stazioni[1]), level=logging.INFO,
             format='%(asctime)s:%(levelname)s:%(message)s')
 
@@ -182,16 +233,56 @@ while True:
     days=datetime.utcnow().utctimetuple().tm_mday
     minutes=datetime.utcnow().utctimetuple().tm_min
 
-
-
-    start_time='%04d%03d%02d00'%(year,day_of_year,hour-1) #i minuti li definisco io a mano tanto saranno sempre 00
+    if interval=='day':
+        
+        start_time='%04d%03d0000'%(year,day_of_year)
+        session_interval=1440
+    elif interval=='hour':
+        start_time='%04d%03d%2d00'%(year,day_of_year,hour) #i minuti li definisco io a mano tanto saranno sempre 00
+        session_interval=60
+    else:
+        print('ERROR: wrong interval')
+        #scrivo nel log?
+    
     #print(start_time)
-
+    
     #devo fare un flag per il datatype:
 
     # mettere il secondo boolean True per scaricare file binario o False per scaricare file RINEX
-    obs=rinex302filename(Stazioni[1],start_time,60,30,'MO',False,False,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
-    print(obs)
+    obs=rinex302filename(Stazioni[1],start_time,session_interval,30,'MO',False,False,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
+    print(obs[12:23])
+    
+    
+
+    ftp = ftplib.FTP('ftp.gter.it')
+    ftp.login(user_ftp,pwd_ftp)
+    ftp.cwd('/www.gter.it/concerteaux_gnss/rawdata/CAMA/dati_giornalieri')
+    data_tot = []
+    data_rinex = []
+
+    ftp.dir(data_tot.append)
+    for i in data_tot:
+        if i.endswith('.gz'):
+            data_rinex.append(i)
+        else:
+            continue
+    ftp.quit()
+
+    for i in data_rinex:
+        print(i[74:85])
+        print(i)
+
+
+    '''
+    with urllib.request.urlopen('https://www.gter.it/concerteaux_gnss/rawdata/CAMA/dati_giornalieri/') as response:
+         html = response.readlines()
+    print(html[-3])
+    '''
+    
+    cur.close()
+    conn.close()
+    sys.exit()
+    
 
     # scarico il file
 
