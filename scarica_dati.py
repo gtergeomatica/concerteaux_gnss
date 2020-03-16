@@ -9,7 +9,8 @@ import sys,os
 import logging
 import time
 import logging #levels are DEBUG, INFO, WARNING, ERROR, CRITICAL
-
+import psycopg2
+from credenziali import *
 
 #passi da fare
 
@@ -164,6 +165,8 @@ def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_fl
 # definisco il nome del file da scaricare
 
 
+print(ip,db,user,password,port)
+sys.exit()
 while True:
     Stazioni=['XXMG','CAMA','AIGI','BEAN','SAOR']
 
