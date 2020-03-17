@@ -164,7 +164,6 @@ def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_fl
 #### MAIN ####
 
 
-# definisco il nome del file da scaricare
 
 '''
 #operazione da fare per ogni stazione
@@ -184,6 +183,7 @@ cur.execute(query)
 
 sys.exit()
 '''
+#leggo intervallo di registrazione (da utende mi aspetto day o hour)
 interval = ''
 try:
     opts, args = getopt.getopt(sys.argv[1:], "hi:n", ["help", "interval="])
@@ -204,27 +204,13 @@ print(interval)
     #quit()
 
 Stazioni=['XXMG','CAMA','AIGI','BEAN','SAOR']
+#operazione da fare per ogni stazione (thread?)
+Data_installazione='20200720000' #(format YYYYDDDHHMM, where DDD= day of the year)
 while True:
+    #DEFINISCO IL FILE ATTUALE DA SCARICARE
     
-
-    #operazione da fare per ogni stazione
-    conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
-    #autocommit
-    conn.set_session(autocommit=True)
-    cur = conn.cursor()
-    query= "SELECT rinex_data from meteognss_ztd.log_dw_rawdata  where staz='{}' order by rinex_data desc limit 1".format(Stazioni[1])
-    try:
-        cur.execute(query)
-    except:
-        print('errore.... scrivo nel log?')
-    a=cur.fetchall()
-    last_rawfile=a[0][0]
-    print(last_rawfile)
-
-    
-    #definisco il file attuale da scaricare
-    logging.basicConfig(filename='./downloaded_raw_data/{0}/{0}_log.txt'.format(Stazioni[1]), level=logging.INFO,
-            format='%(asctime)s:%(levelname)s:%(message)s')
+    #logging.basicConfig(filename='./downloaded_raw_data/{0}/{0}_log.txt'.format(Stazioni[1]), level=logging.INFO,
+    #        format='%(asctime)s:%(levelname)s:%(message)s')
 
     day_of_year = datetime.utcnow().utctimetuple().tm_yday
     year=datetime.utcnow().utctimetuple().tm_year
@@ -242,6 +228,47 @@ while True:
         session_interval=60
     else:
         print('ERROR: wrong interval')
+    #tdb=to be downloaded
+    file_tbd=rinex302filename(Stazioni[1],start_time,session_interval,30,'MO',False,False,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
+    print(file_tbd[12:23])
+
+    #LEGGO ULTIMO FILE SCARICATO DA DB
+    conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
+    #autocommit
+    conn.set_session(autocommit=True)
+    cur = conn.cursor()
+    #prova con file rinex orari (per file dat e rinex giornalieri cambiare tabella)
+    query= "SELECT rinex_data from meteognss_ztd.log_dw_rinexdata_hour  where staz='{}' order by rinex_data desc limit 1".format(Stazioni[1])
+    try:
+        cur.execute(query)
+    except:
+        print('errore.... scrivo nel log?')
+
+    a=cur.fetchall()
+    #CONTROLLO ESISTENZA ULTIMO FILE SCARICATO
+    if len(a)==0: #empty table (first time running script)
+        last_dwnl_file=Data_installazione
+    else: 
+        last_dwnl_file=a[0][0]
+    
+    print(last_dwnl_file)
+
+    #ELENCO LISTA FILE ATTESI DA SCARICARE
+    list_tbd=[]
+    now=datetime.now()
+    yd=now.strftime("%j")
+    inizio=datetime.strptime(last_dwnl_file,"%Y%j%H%M")
+    fine=datetime.strptime(file_tbd[12:23],"%Y%j%H%M")
+    print(inizio,fine)
+    print(fine-inizio)
+    
+    while inizio!=fine:
+        list_tbd.append(inizio.strftime('%Y%j%H%M'))
+        inizio+=timedelta(hours=1)
+
+    print(list_tbd)
+    sys.exit()
+
         #scrivo nel log?
     
     #print(start_time)
@@ -249,27 +276,26 @@ while True:
     #devo fare un flag per il datatype:
 
     # mettere il secondo boolean True per scaricare file binario o False per scaricare file RINEX
-    obs=rinex302filename(Stazioni[1],start_time,session_interval,30,'MO',False,False,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
-    print(obs[12:23])
+
     
     
 
     ftp = ftplib.FTP('ftp.gter.it')
     ftp.login(user_ftp,pwd_ftp)
-    ftp.cwd('/www.gter.it/concerteaux_gnss/rawdata/CAMA/dati_giornalieri')
+    ftp.cwd('/www.gter.it/concerteaux_gnss/rawdata/CAMA/dati_orari')
     data_tot = []
     data_rinex = []
 
     ftp.dir(data_tot.append)
     for i in data_tot:
-        if i.endswith('.gz'):
+        if i.endswith('.dat'):
             data_rinex.append(i)
         else:
             continue
     ftp.quit()
 
     for i in data_rinex:
-        print(i[74:85])
+        #print(i[74:85])
         print(i)
 
 
