@@ -277,7 +277,7 @@ while True:
     
     if len(list_tbd)==0:
         #CERCO DI SCARICARE FILE CHE NON SONO STATI SCARICATI IN PRECEDENZA
-        print("caso da implementare")
+        
         query="SELECT rinex_data FROM meteognss_ztd.log_dw_rinexdata_hour where cod_dw != 0 order by rinex_data asc;"
         try:
             cur.execute(query)
