@@ -134,8 +134,8 @@ def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_fl
     # DATA FREQ
     
     freq=timedelta(seconds=obs_freq)
-    print(freq)
-    print((freq.seconds//60)%60,freq.seconds)
+    #print(freq)
+    #print((freq.seconds//60)%60,freq.seconds)
     if freq.seconds!=0 and (freq.seconds//60)%60==0:
         DF='%02dS'%(freq.seconds)
     elif freq.seconds==0 and (freq.seconds//60)%60!=0:
@@ -224,13 +224,10 @@ while True:
         start_time='%04d%03d0000'%(year,day_of_year)
         session_interval=1440
     elif interval=='hour':
-        start_time='%04d%03d%2d00'%(year,day_of_year,hour) #i minuti li definisco io a mano tanto saranno sempre 00
+        start_time='%04d%03d%02d00'%(year,day_of_year,hour) #i minuti li definisco io a mano tanto saranno sempre 00
         session_interval=60
     else:
         print('ERROR: wrong interval')
-    #tdb=to be downloaded
-    file_tbd=rinex302filename(Stazioni[1],start_time,session_interval,30,'MO',False,False,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
-    print(file_tbd[12:23])
 
     #LEGGO ULTIMO FILE SCARICATO DA DB
     conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
@@ -245,6 +242,7 @@ while True:
         print('errore.... scrivo nel log?')
 
     a=cur.fetchall()
+
     #CONTROLLO ESISTENZA ULTIMO FILE SCARICATO
     if len(a)==0: #empty table (first time running script)
         last_dwnl_file=Data_installazione
@@ -258,7 +256,7 @@ while True:
     now=datetime.now()
     yd=now.strftime("%j")
     inizio=datetime.strptime(last_dwnl_file,"%Y%j%H%M")
-    fine=datetime.strptime(file_tbd[12:23],"%Y%j%H%M")
+    fine=datetime.strptime(start_time,"%Y%j%H%M")
     print(inizio,fine)
     print(fine-inizio)
     
@@ -267,75 +265,70 @@ while True:
         inizio+=timedelta(hours=1)
 
     print(list_tbd)
-    sys.exit()
 
-        #scrivo nel log?
+    #CONTROLLO SE LISTA DA SCARICARE VUOTA
+    if len(list_tbd)==0:
+        #CERCO DI SCARICARE FILE CHE NON SONO STATI SCARICATI IN PRECEDENZA
+        print("caso da implementare")
+    else:
+        #SCARICO I FILE
+        #CONFRONTO LISTA FILE ATTESI CON LISTA FILE SU SERVER
+        ftp = ftplib.FTP('ftp.gter.it')
+        ftp.login(user_ftp,pwd_ftp)
+        ftp.cwd('/www.gter.it/concerteaux_gnss/rawdata/CAMA/dati_orari')
+        data_tot = []
+        data_rinex = []
+
+        ftp.dir(data_tot.append)
+        for i in data_tot:
+            if i.endswith('.gz'):
+                data_rinex.append(i[74:85])
+            else:
+                continue
+        ftp.quit()
+
+        for i in list_tbd:
+            
+            if i not in data_rinex:
+                print(i,'non presente')
+                query="INSERT INTO meteognss_ztd.log_dw_rinexdata_hour (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'file not sent by the receiver');" %(i,Stazioni[1],1)
+                try:
+                    cur.execute(query)
+                except:
+                    print('violazione chiave primaria.... scrivo nel log?')
+            
+            elif i in data_rinex:
+                print(i,'presente')
+                file_tbd=rinex302filename(Stazioni[1],i,session_interval,30,'MO',False,False,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
+                #print(file_tbd)
+                
+                url='https://www.gter.it/concerteaux_gnss/rawdata/{}/dati_orari/{}'.format(Stazioni[1],file_tbd)
+                output_directory ='./downloaded_raw_data/CAMA/'
+                try:
+                    wget.download(url, out=output_directory)
+                    query="INSERT INTO meteognss_ztd.log_dw_rinexdata_hour (rinex_data,staz,cod_dw) VALUES ('%s', '%s',%d);" %(i,Stazioni[1],0)
+                    try:
+                        cur.execute(query)
+                    except:
+                        print('violazione chiave primaria.... scrivo nel log?')
+
+                except Exception as e:
+                    print("Could not download for reason ",str(e))
+                    query="INSERT INTO meteognss_ztd.log_dw_rinexdata_hour (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'%s');" %(i,Stazioni[1],1,str(e))
+                    '''
+                    da decommentare quando lo script sarà su gishosting?
+                    try:
+                        cur.execute(query)
+                    except:
+                        print('violazione chiave primaria.... scrivo nel log?')
+                    '''    
     
-    #print(start_time)
-    
-    #devo fare un flag per il datatype:
+    time.sleep(600) #10 minuti
 
-    # mettere il secondo boolean True per scaricare file binario o False per scaricare file RINEX
 
     
     
 
-    ftp = ftplib.FTP('ftp.gter.it')
-    ftp.login(user_ftp,pwd_ftp)
-    ftp.cwd('/www.gter.it/concerteaux_gnss/rawdata/CAMA/dati_orari')
-    data_tot = []
-    data_rinex = []
-
-    ftp.dir(data_tot.append)
-    for i in data_tot:
-        if i.endswith('.dat'):
-            data_rinex.append(i)
-        else:
-            continue
-    ftp.quit()
-
-    for i in data_rinex:
-        #print(i[74:85])
-        print(i)
-
-
-    '''
-    with urllib.request.urlopen('https://www.gter.it/concerteaux_gnss/rawdata/CAMA/dati_giornalieri/') as response:
-         html = response.readlines()
-    print(html[-3])
-    '''
-    
-    cur.close()
-    conn.close()
-    sys.exit()
     
 
-    # scarico il file
 
-    # devo vedere utlimo file processato (faccio un file con ultima ora processata, oppure 5 file di log di cui leggo ultima riga)
-    # fare differenza rispetto a ora, e capire quanti e quali file cercare (potrebbe essere sia che il mio script non abbia girato sia che il ricevitore non abbia mandato il dato)
-    # cerco i file
-
-    with open ('./downloaded_raw_data/{0}/{0}_log.txt'.format(Stazioni[1]),'r') as logfile:
-        righe=logfile.readlines()
-    print(righe[-1])
-
-    try:
-        bs_test='CAMA00ITA_R_20200711300_01H_31S.dat'
-        
-        url='https://www.gter.it/concerteaux_gnss/rawdata/{}/dati_orari/{}'.format(Stazioni[1],obs)
-        output_directory ='./downloaded_raw_data/CAMA/'
-        filename = wget.download(url, out=output_directory)
-        logging.info('Downloaded file {}:0'.format(obs)) #0 ok
-
-    except:
-        logging.warning('File {} NOT Downloaded:1'.format(obs)) #1 errore
-
-    time.sleep(3600)
-
-
-#to do :
-# - implementare lettura e scrittura tabella 
-# - leggere ultimo file scaricato e scaricare tutti i file da li in giu'
-# - capire come mai ogni tanto non mandi i file binari (lanciare script sul 99 per un po di tempo)
-# - capire come fare a leggere tutti i file di una pagina web (e/o fare un ls del server ftp)
