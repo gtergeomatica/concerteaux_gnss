@@ -322,7 +322,8 @@ while True:
                     except:
                         print('violazione chiave primaria.... scrivo nel log?')
                     '''    
-    
+    cur.close()
+    conn.close()
     time.sleep(600) #10 minuti
 
 
