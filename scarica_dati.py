@@ -215,6 +215,7 @@ while True:
     day_of_year = datetime.utcnow().utctimetuple().tm_yday
     year=datetime.utcnow().utctimetuple().tm_year
     hour=datetime.utcnow().utctimetuple().tm_hour
+    hour_start=hour-1
     months=datetime.utcnow().utctimetuple().tm_mon
     days=datetime.utcnow().utctimetuple().tm_mday
     minutes=datetime.utcnow().utctimetuple().tm_min
@@ -224,7 +225,7 @@ while True:
         start_time='%04d%03d0000'%(year,day_of_year)
         session_interval=1440
     elif interval=='hour':
-        start_time='%04d%03d%02d00'%(year,day_of_year,hour) #i minuti li definisco io a mano tanto saranno sempre 00
+        start_time='%04d%03d%02d00'%(year,day_of_year,hour_start) #i minuti li definisco io a mano tanto saranno sempre 00
         session_interval=60
     else:
         print('ERROR: wrong interval')
@@ -235,7 +236,7 @@ while True:
     conn.set_session(autocommit=True)
     cur = conn.cursor()
     #prova con file rinex orari (per file dat e rinex giornalieri cambiare tabella)
-    query= "SELECT rinex_data from meteognss_ztd.log_dw_rinexdata_hour  where staz='{}' order by rinex_data desc limit 1".format(Stazioni[1])
+    query= "SELECT rinex_data from meteognss_ztd.log_dw_rinexdata_hour  where staz='{}' and cod_dw=0 order by rinex_data desc limit 1".format(Stazioni[1])
     try:
         cur.execute(query)
     except:
@@ -249,8 +250,8 @@ while True:
     else: 
         last_dwnl_file=a[0][0]
     
-    print(last_dwnl_file)
-
+    print('\n'+last_dwnl_file)
+    print(start_time)
     #ELENCO LISTA FILE ATTESI DA SCARICARE
     list_tbd=[]
     now=datetime.now()
@@ -260,13 +261,20 @@ while True:
     print(inizio,fine)
     print(fine-inizio)
     
-    while inizio!=fine:
-        list_tbd.append(inizio.strftime('%Y%j%H%M'))
-        inizio+=timedelta(hours=1)
-
+    print('prima while',inizio==fine)
+    if inizio != fine:
+        inizio+=timedelta(hours=1)#per non includere nella lista da scaricare l'ultimo file scaricato
+        while inizio!=fine:
+            #print('dentro while')
+            list_tbd.append(inizio.strftime('%Y%j%H%M'))
+            inizio+=timedelta(hours=1)
+        list_tbd.append(fine.strftime('%Y%j%H%M')) #per includere nella lista file da scaricare l'ultimo
+    
     print(list_tbd)
 
+    
     #CONTROLLO SE LISTA DA SCARICARE VUOTA
+    print(len(list_tbd))
     if len(list_tbd)==0:
         #CERCO DI SCARICARE FILE CHE NON SONO STATI SCARICATI IN PRECEDENZA
         print("caso da implementare")
