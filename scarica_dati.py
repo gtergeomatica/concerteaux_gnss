@@ -164,35 +164,25 @@ def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_fl
 #### MAIN ####
 
 
+interval=sys.argv[1] 
+data_format=sys.argv[2]
+print(interval,data_format)
 
-'''
-#operazione da fare per ogni stazione
-conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
-#autocommit
-conn.set_session(autocommit=True)
-cur = conn.cursor()
-
-
-rinextest='20200760016'
-staz='BEAN'
-cod_dw_test=0
-
-query="INSERT INTO meteognss_ztd.log_dw_rawdata(rinex_data,staz,cod_dw) VALUES ('%s', '%s',%d);" %(rinextest,staz,cod_dw_test)
-        #print i,query
-cur.execute(query)
 
 sys.exit()
+
 '''
 #leggo intervallo di registrazione (da utende mi aspetto day o hour)
 interval = ''
+data_format=''
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hi:n", ["help", "interval="])
+    opts, args = getopt.getopt(sys.argv[1:], "hi:n", "hf:n" ["help", "interval=", "format="])
 except getopt.GetoptError:
-    print('scarica_dati.py -i <interval>')
+    print('scarica_dati.py -i <interval> -f <format>')
     sys.exit(2)
 for opt, arg in opts:
     if opt == '-h':
-        print('noaa2postgresql_ftp.py -i <interval (day or hour)>')
+        print('noaa2postgresql_ftp.py -i <interval (day or hour)> -f <format (binary or rinex)')
         sys.exit()
     elif opt in ("-i", "--interval"):
         interval = arg
@@ -200,9 +190,15 @@ for opt, arg in opts:
 if interval=='':
     print('ERROR: specify an interval')
     sys.exit()
+elif data_format=='':
+    print('ERROR: specify the data format')
+    sys.exit()
 print(interval)
-    #quit()
+print(data_format)
 
+sys.exit()
+    #quit()
+'''
 Stazioni=['XXMG','CAMA','AIGI','BEAN','SAOR']
 #operazione da fare per ogni stazione (thread?)
 Data_installazione='20200720000' #(format YYYYDDDHHMM, where DDD= day of the year)
