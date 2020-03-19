@@ -306,7 +306,8 @@ while True:
                 #print(i[0])
                 file_tbd=rinex302filename(Stazioni[1],i[0],session_interval,30,'MO',False,bin_flag,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
                 url='https://www.gter.it/concerteaux_gnss/rawdata/{}/{}/{}'.format(Stazioni[1],ftp_interv_folder,file_tbd)
-                output_directory ='./downloaded_data/{}/{}/'.format(Stazioni[1],data_format)
+                #print(url)
+                output_directory ='./downloaded_raw_data/{}/{}/'.format(Stazioni[1],data_format)
                 print(output_directory)
                 try:
                     wget.download(url, out=output_directory)
@@ -359,7 +360,7 @@ while True:
                 #print(file_tbd)
                 
                 url='https://www.gter.it/concerteaux_gnss/rawdata/{}/{}/{}'.format(Stazioni[1],ftp_interv_folder,file_tbd)
-                output_directory ='./downloaded_data/{}/{}/'.format(Stazioni[1],data_format)
+                output_directory ='./downloaded_raw_data/{}/{}/'.format(Stazioni[1],data_format)
                 try:
                     wget.download(url, out=output_directory)
                     query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw) VALUES ('%s', '%s',%d);" %(data_format,interval, i,Stazioni[1],0)
