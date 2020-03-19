@@ -248,7 +248,7 @@ while True:
     conn.set_session(autocommit=True)
     cur = conn.cursor()
     #prova con file rinex orari (per file dat e rinex giornalieri cambiare tabella)
-    query= "SELECT rinex_data from meteognss_ztd.log_dw_rinexdata_hour  where staz='{}' order by rinex_data desc limit 1".format(Stazioni[1])
+    query= "SELECT rinex_data from meteognss_ztd.log_dw_rinexdata_hour where staz='{}' order by rinex_data desc limit 1".format(Stazioni[1])
     try:
         cur.execute(query)
     except:
@@ -289,7 +289,6 @@ while True:
     
     if len(list_tbd)==0:
         #CERCO DI SCARICARE FILE CHE NON SONO STATI SCARICATI IN PRECEDENZA
-        
         query="SELECT rinex_data FROM meteognss_ztd.log_dw_{}data_{} where cod_dw != 0 order by rinex_data asc;".format(data_format,interval)
         try:
             cur.execute(query)
@@ -297,8 +296,7 @@ while True:
             print('errore.... scrivo nel log?')
 
         arretrati_tbd=cur.fetchall()
-        #print(a)
-        
+                
         #print(arretrati_tbd)
         
         if len(arretrati_tbd)!=0: 
@@ -309,10 +307,11 @@ while True:
                 file_tbd=rinex302filename(Stazioni[1],i[0],session_interval,30,'MO',False,bin_flag,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
                 url='https://www.gter.it/concerteaux_gnss/rawdata/{}/{}/{}'.format(Stazioni[1],ftp_interv_folder,file_tbd)
                 output_directory ='./downloaded_data/{}/{}/'.format(Stazioni[1],data_format)
-                
+                print(output_directory)
                 try:
                     wget.download(url, out=output_directory)
                     query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=0 WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],Stazioni[1])
+                    
                     try:
                         cur.execute(query)
                     except:
@@ -321,6 +320,7 @@ while True:
                 except Exception as e:
                     #print("Could not download for reason ",str(e))
                     query="UPDATE meteognss_ztd.log_dw_{}data_{} SET dw_failure_reason='{}' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval, str(e),i[0],Stazioni[1])
+                    print(query)
                     try:
                         cur.execute(query)
                     except:
