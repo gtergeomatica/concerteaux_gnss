@@ -248,7 +248,7 @@ while True:
     conn.set_session(autocommit=True)
     cur = conn.cursor()
     #prova con file rinex orari (per file dat e rinex giornalieri cambiare tabella)
-    query= "SELECT rinex_data from meteognss_ztd.log_dw_rinexdata_hour where staz='{}' order by rinex_data desc limit 1".format(Stazioni[1])
+    query= "SELECT rinex_data from meteognss_ztd.log_dw_{}data_{} where staz='{}' order by rinex_data desc limit 1".format(data_format,interval, Stazioni[1])
     try:
         cur.execute(query)
     except:
@@ -308,7 +308,7 @@ while True:
                 url='https://www.gter.it/concerteaux_gnss/rawdata/{}/{}/{}'.format(Stazioni[1],ftp_interv_folder,file_tbd)
                 #print(url)
                 output_directory ='./downloaded_raw_data/{}/{}/'.format(Stazioni[1],data_format)
-                print(output_directory)
+                #print(output_directory)
                 try:
                     wget.download(url, out=output_directory)
                     query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=0 WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],Stazioni[1])
@@ -370,7 +370,7 @@ while True:
                         print('violazione chiave primaria.... scrivo nel log?')
 
                 except Exception as e:
-                    print("Could not download for reason ",str(e))
+                    #print("Could not download for reason ",str(e))
                     query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'%s');" %(data_format,interval, i,Stazioni[1],1,str(e))
                     '''
                     da decommentare quando lo script sarà su gishosting?
