@@ -321,7 +321,7 @@ while True:
                 except Exception as e:
                     #print("Could not download for reason ",str(e))
                     query="UPDATE meteognss_ztd.log_dw_{}data_{} SET dw_failure_reason='{}' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval, str(e),i[0],Stazioni[1])
-                    print(query)
+                    #print(query)
                     try:
                         cur.execute(query)
                     except:
@@ -338,7 +338,7 @@ while True:
 
         ftp.dir(data_tot.append)
         for i in data_tot:
-            if i.endswith(''):
+            if i.endswith('{}'.format(end_fname)):
                 data_rinex.append(i[74:85])
             else:
                 continue
