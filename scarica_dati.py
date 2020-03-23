@@ -206,6 +206,9 @@ sys.exit()
 Stazioni=['XXMG','CAMA','AIGI','BEAN','SAOR']
 #operazione da fare per ogni stazione (thread?)
 Data_installazione='20200720000' #(format YYYYDDDHHMM, where DDD= day of the year)
+
+output_directory ='./downloaded_raw_data/{}/{}/'.format(Stazioni[1],data_format)
+
 #while True:
     #DEFINISCO IL FILE ATTUALE DA SCARICARE
     
@@ -289,7 +292,8 @@ print(list_tbd)
 
 if len(list_tbd)==0:
     #CERCO DI SCARICARE FILE CHE NON SONO STATI SCARICATI IN PRECEDENZA
-    query="SELECT rinex_data FROM meteognss_ztd.log_dw_{}data_{} where cod_dw != 0 order by rinex_data asc;".format(data_format,interval)
+    # seleziono solo gli ultimi 24 file non scaricati (da decidere se 24 è un numero che può andare)
+    query="SELECT rinex_data FROM meteognss_ztd.log_dw_{}data_{} where cod_dw != 0 order by rinex_data desc limit 24;".format(data_format,interval)
     try:
         cur.execute(query)
     except:
@@ -297,7 +301,7 @@ if len(list_tbd)==0:
 
     arretrati_tbd=cur.fetchall()
             
-    #print(arretrati_tbd)
+    print(arretrati_tbd)
     
     if len(arretrati_tbd)!=0: 
         # CI SONO FILE ARRETRATI
@@ -307,8 +311,6 @@ if len(list_tbd)==0:
             file_tbd=rinex302filename(Stazioni[1],i[0],session_interval,30,'MO',False,bin_flag,'Hatanaka-RINEX302','tar.gz') #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
             url='https://www.gter.it/concerteaux_gnss/rawdata/{}/{}/{}'.format(Stazioni[1],ftp_interv_folder,file_tbd)
             #print(url)
-            output_directory ='./downloaded_raw_data/{}/{}/'.format(Stazioni[1],data_format)
-            #print(output_directory)
             try:
                 wget.download(url, out=output_directory)
                 query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=0 WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],Stazioni[1])
@@ -330,7 +332,7 @@ if len(list_tbd)==0:
 else:
     #SCARICO I FILE
     #CONFRONTO LISTA FILE ATTESI CON LISTA FILE SU SERVER
-    ftp = ftplib.FTP('ftp.gter.it')
+    ftp = ftplib.FTP('{}'.format(url_ftp))
     ftp.login(user_ftp,pwd_ftp)
     ftp.cwd('/www.gter.it/concerteaux_gnss/rawdata/{}/{}'.format(Stazioni[1],ftp_interv_folder))
     data_tot = []
@@ -360,7 +362,7 @@ else:
             #print(file_tbd)
             
             url='https://www.gter.it/concerteaux_gnss/rawdata/{}/{}/{}'.format(Stazioni[1],ftp_interv_folder,file_tbd)
-            output_directory ='./downloaded_raw_data/{}/{}/'.format(Stazioni[1],data_format)
+            
             try:
                 wget.download(url, out=output_directory)
                 query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw) VALUES ('%s', '%s',%d);" %(data_format,interval, i,Stazioni[1],0)
