@@ -315,7 +315,7 @@ def main():
                 #print(url)
                 try:
                     wget.download(url, out=output_directory)
-                    query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=0 WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],Stazioni[1])
+                    query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=0, dw_failure_reason='file downloaded in a second time' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],Stazioni[1])
 
                     try:
                         cur.execute(query)
