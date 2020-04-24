@@ -2,6 +2,34 @@
 
 TODO istruzioni (lorenzo)
 
+
+Conversione in automatico da .dat a RINEX
+-----------------------------------------
+
+Si utilizza il tool di novatel scaricabile a [questp link](https://www.novatel.com/support/info/documents/809) (scegliere la versione Linux 64 bit)
+
+Estrarre la cartella scaricata e aprire nel terminare la cartella, ed eseguire il file di installazione
+
+```
+~$ cd /Scaricati/NovAtel-Convert-Linux-64bit/R1/NovAtelConvert
+
+~$ ./NovAtelConvert_Setup
+
+```
+Il programma verrà installato nella cartella /opt/NovAtel Inc/NovAtel Convert
+
+NB perchè il programma funzioni è necessario installare la libreria libxcb-xinput0:
+
+```
+~$ sudo apt-get install libxcb-xinput0
+```
+Per convertire il file .dat a linea di comando la sinstassi è:
+
+```
+~$ /opt/NovAtel\ Inc/NovAtel\ Convert/NovAtelConvert -r3.04 /path/to/file.dat
+```
+
+
 Far girare lo script sul crontab
 ---------------------------------
 
