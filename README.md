@@ -1,6 +1,8 @@
 # Repository per la raccolta dati dalle stazioni GNSS, e loro elaborazione al fine di ottenere ZTD
 
-TODO istruzioni (lorenzo)
+## Schema indicativo dello script scarica_dati.py
+
+![flusso_download](https://github.com/gtergeomatica/concerteaux_gnss/blob/master/img/flusso_download.jpg)
 
 
 Conversione in automatico da .dat a RINEX
