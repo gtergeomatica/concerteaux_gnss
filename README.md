@@ -40,7 +40,7 @@ Far girare lo script sul crontab
 * crontab dell'utente: il crontab dell'utente si visualizza con il comando ``` crontab -l ``` e si edita  con il comando  ``` crontab -e ``` la sintassi è la seguente
 
 ```
-1-59/* * * * /usr/bin/python3 /percorso_assoluto_script/scarica_dati.py hour rinex > /tmp/file_log.txt
+1-59/* * * * /usr/bin/python3 /percorso_assoluto_script/scarica_dati.py hour > /tmp/file_log.txt
 
 ```
 
