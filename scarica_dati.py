@@ -21,7 +21,7 @@ import ftplib
 #1.1 per scaricare il dato bisogna comporre in automatico il suo nome (quindi nomenclatura RINEX 3.02)
 
 
-def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_flag,bin_flag,data_format='RINEX',compression='zip'):
+def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_flag,bin_flag,data_format='RINEX',compression=None):
     '''function to dynamically define the filename in rinex 3.02 format)
 
     Needed parameters
@@ -93,7 +93,7 @@ def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_fl
         .gz
         .tar.gz
         etc
-
+        if None the filename will ends with .YYO
     '''
     filename=''
 
@@ -153,7 +153,11 @@ def rinex302filename(st_code,ST,session_interval,obs_freq,data_type,data_type_fl
         if bin_flag:
             filename+='.dat'
         else:
-            filename+='_{}.{}'.format(data_format,compression)
+            if compression != None:
+                filename+='_{}.{}'.format(data_format,compression)      
+            else:
+                filename+='.{}O'.format(ST[2:4])
+            
     
     return filename
 
@@ -179,14 +183,19 @@ def dat2rinex(path,binfile,rinex_version):
     for i in nav_files:
         os.system('rm {}{}'.format(path,i))
     #rimuovo il file binario
-    os.system('rm {}{}'.format(path,binfile))
+    #os.system('rm {}{}'.format(path,binfile))
     return conv_status
-def uncompressRinex(path,rinexfile,compression,hatanaka=True):
+
+
+def uncompressRinex(dir_path,path,rinexfile,compression,hatanaka=True):
     '''
     function to uncompress an archive containing a rinex file
     the function uncompress the rinex if it's in hatanaka format
     the function also changes the extension of the rinex file:
     rnx --> yyO
+    Lastly the function removes the input rinex file
+    The function returns the uncompressed rinex file name or None if the conversion 
+    was not successful
     '''
     if not os.path.exists('{}temp'.format(path)):
         os.makedirs('{}temp'.format(path))
@@ -204,7 +213,8 @@ def uncompressRinex(path,rinexfile,compression,hatanaka=True):
             nav_file=[i for i in os.listdir('{}temp'.format(path)) if i.endswith('MN.rnx')]
             os.system('rm {}temp/{}'.format(path,nav_file[-1]))
             
-            os.system('./CRX2RNX {}temp/{}'.format(path,htk_rinex[-1]))
+            
+            os.system('{}/CRX2RNX {}temp/{}'.format(dir_path,path,htk_rinex[-1]))
             os.system('rm {}temp/{}'.format(path,htk_rinex[-1]))
 
             new_rinex=os.listdir('{}temp/'.format(path))[0]
@@ -215,6 +225,8 @@ def uncompressRinex(path,rinexfile,compression,hatanaka=True):
             
             os.system('rm {}{}'.format(path,rinexfile))
             os.system('rmdir {}temp'.format(path))
+            return newrnxname
+
         except Exception as e:
             print('can\'t pass from .rnx to .yyO for reason ',e)
             return
@@ -232,13 +244,18 @@ def uncompressRinex(path,rinexfile,compression,hatanaka=True):
             
             os.system('rm {}{}'.format(path,rinexfile))
             os.system('rmdir {}temp'.format(path))
-
+            return newrnxname
         except Exception as e:
             print('can\'t pass from .rnx to .yyO for reason ',e)
-            return
+            return 
+
+
 
 #### MAIN ####
 def main():
+
+
+    print('\nStart script ',datetime.now())
     try:
         interval=sys.argv[1]
     except:
@@ -247,18 +264,18 @@ def main():
 
     #input sulla registrazione del dato
     data_format='rinex'
-    rinex_format='RINEX302'
-    obs_freq=1
+    rinex_format='Hatanaka-RINEX302'
+    obs_freq=30
     compression_format='tar.gz'
-
-    Stazioni=['XXMG','BEAN','AIGI','CAMA','SAOR']
-    #operazione da fare per ogni stazione (thread?)
-    Data_installazione='20200981200' #(format YYYYDDDHHMM, where DDD= day of the year)
-
-    #definizione_server_ftp_input www.gter.it/concert...
+    
+    
+    
+    Data_installazione='20201220000' #(format YYYYDDDHHMM, where DDD= day of the year)
+    
+    
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    output_directory ='{2}/downloaded_raw_data/{0}/{1}/'.format(Stazioni[1],data_format,dir_path)
+    #output_directory ='{2}/downloaded_raw_data/{0}/{1}/'.format(stz,data_format,dir_path)
     #print('la directory di output è',output_directory)
 
 
@@ -269,6 +286,7 @@ def main():
     months=datetime.utcnow().utctimetuple().tm_mon
     days=datetime.utcnow().utctimetuple().tm_mday
     minutes=datetime.utcnow().utctimetuple().tm_min
+
 
     if interval=='day':
 
@@ -284,201 +302,251 @@ def main():
         print('ERROR: wrong interval')
 
 
-    #LEGGO ULTIMO FILE SCARICATO DA DB
+    #CONNESSIONE AL DB
     conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
     #autocommit
     conn.set_session(autocommit=True)
     cur = conn.cursor()
     #prova con file rinex orari (per file dat e rinex giornalieri cambiare tabella)
-    query= "SELECT rinex_data from meteognss_ztd.log_dw_{}data_{} where staz='{}' order by rinex_data desc limit 1".format(data_format,interval, Stazioni[1])
+
+    #Stazioni=['XXMG','BEAN','AIGI','CAMA','SAOR']
+    
+
+    query= "SELECT cod FROM concerteaux.stazioni_lowcost WHERE operativa=True"
     
     try:
         cur.execute(query)
-    except:
-        print('errore.... scrivo nel log?')
+    except Exception as e:
+        print('errore: ',e)
 
-    a=cur.fetchall()
+    Stazioni=[i[0] for i in cur.fetchall()] 
+    print('\nAcive Stations:',end=' ')
+    for s in Stazioni:        
+        print(s, end=' ')
 
-    #CONTROLLO ESISTENZA ULTIMO FILE SCARICATO
-    if len(a)==0: #empty table (first time running script)
-        last_dwnl_file=Data_installazione
-    else:
-        last_dwnl_file=a[0][0]
-
-    print('last_dwnl_file = '+last_dwnl_file)
-    print('start_time = ',start_time)
-    #ELENCO LISTA FILE ATTESI DA SCARICARE
-    list_tbd=[]
-    now=datetime.now()
-    yd=now.strftime("%j")
-    inizio=datetime.strptime(last_dwnl_file,"%Y%j%H%M")
-    fine=datetime.strptime(start_time,"%Y%j%H%M")
-    #print(inizio,fine)
-    #print(fine-inizio)
-
-    #print('prima while',inizio==fine)
-    if inizio != fine:
-        inizio+=timedelta(hours=1)#per non includere nella lista da scaricare l'ultimo file scaricato
-        while inizio!=fine:
-            #print('dentro while')
-            list_tbd.append(inizio.strftime('%Y%j%H%M'))
-            inizio+=timedelta(hours=1)
-        list_tbd.append(fine.strftime('%Y%j%H%M')) #per includere nella lista file da scaricare l'ultimo
-
-    print(list_tbd)
+    print('\n\n********** Start Loop on Stations **********\n')
+    
 
 
-    #CONTROLLO SE LISTA DA SCARICARE VUOTA
+    for stz in Stazioni: #CICLO FOR su TUTTE LE STAZIONI PRESENTI
 
-    if len(list_tbd)==0:
-        #CERCO DI SCARICARE FILE CHE NON SONO STATI SCARICATI IN PRECEDENZA
-        # seleziono solo gli ultimi 24 file non scaricati (da decidere se 24 è un numero che può andare)
-        query="SELECT rinex_data FROM meteognss_ztd.log_dw_{}data_{} where cod_dw != 0 order by rinex_data desc limit 24;".format(data_format,interval)
+        print('Station: ',stz)
+        #LEGGO ULTIMO FILE SCARICATO DA DB
+        query= "SELECT rinex_data from meteognss_ztd.log_dw_{}data_{} where staz='{}' order by rinex_data desc limit 1".format(data_format,interval, stz)
+        
         try:
             cur.execute(query)
         except:
             print('errore.... scrivo nel log?')
 
-        arretrati_tbd=cur.fetchall()
+        a=cur.fetchall()
 
-        print(arretrati_tbd)
+        #CONTROLLO ESISTENZA ULTIMO FILE SCARICATO
+        if len(a)==0: #empty table (first time running script)
+            last_dwnl_file=Data_installazione
+        else:
+            last_dwnl_file=a[0][0]
 
-        if len(arretrati_tbd)!=0:
-            # CI SONO FILE ARRETRATI
-            for i in arretrati_tbd:
+        print('last_dwnl_file = '+last_dwnl_file)
+        print('start_time = ',start_time)
+        #ELENCO LISTA FILE ATTESI DA SCARICARE
+        list_tbd=[]
+        now=datetime.now()
+        yd=now.strftime("%j")
+        inizio=datetime.strptime(last_dwnl_file,"%Y%j%H%M")
+        fine=datetime.strptime(start_time,"%Y%j%H%M")
+        #print(inizio,fine)
+        #print(fine-inizio)
 
-                #provo a scaricare il rinex
-                file_tbd=rinex302filename(Stazioni[1],i[0],session_interval,obs_freq,'MO',False,False,rinex_format,compression_format) #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
-                url='https://www.gter.it/concerteaux_gnss/rawdata/{}/{}/{}'.format(Stazioni[1],ftp_interv_folder,file_tbd)
+        #print('prima while',inizio==fine)
+        if inizio != fine:
+            inizio+=timedelta(hours=1)#per non includere nella lista da scaricare l'ultimo file scaricato
+            while inizio!=fine:
+                #print('dentro while')
+                list_tbd.append(inizio.strftime('%Y%j%H%M'))
+                inizio+=timedelta(hours=1)
+            list_tbd.append(fine.strftime('%Y%j%H%M')) #per includere nella lista file da scaricare l'ultimo
 
-                try:
-                    wget.download(url, out=output_directory)
-                    uncompressRinex(path,file_tbd,compression_format,False)
-                    query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=0, dw_failure_reason='file downloaded in a second time' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],Stazioni[1])
-                    try:
-                        cur.execute(query)
-                    except:
-                        print('violazione chiave primaria.... scrivo nel log?')
+        print('file to be downloaded ',list_tbd)
 
-                except:
-                    #non riesco a scaricare il rinex, quindi provo con il binario
-                    file_tbd=rinex302filename(Stazioni[1],i[0],session_interval,obs_freq,'MO',False,True)
-                    url='https://www.gter.it/concerteaux_gnss/rawdata/{}/{}/{}'.format(Stazioni[1],ftp_interv_folder,file_tbd)
-                    try:
-                        wget.download(url, out=output_directory)
-                        print(i,'scaricato in binario')
-                        #file binario scaricato, lo devo convertire in RINEX
-                        conversione=dat2rinex(output_directory,file_tbd,3.04)
+
+        #CONTROLLO SE LISTA DA SCARICARE VUOTA
+
+        if len(list_tbd)==0:
+            #CERCO DI SCARICARE FILE CHE NON SONO STATI SCARICATI IN PRECEDENZA
+            # seleziono solo gli ultimi 24 file non scaricati (da decidere se 24 è un numero che può andare)
+            query="SELECT rinex_data FROM meteognss_ztd.log_dw_{}data_{} where staz='{}' and cod_dw != 0 order by rinex_data desc limit 24;".format(data_format,interval,st)
+            try:
+                cur.execute(query)
+            except:
+                print('errore.... scrivo nel log?')
+
+            arretrati_tbd=cur.fetchall()
+            print('old file to be downloaded ',arretrati_tbd)
+
+            if len(arretrati_tbd)!=0:
+                # CI SONO FILE ARRETRATI
+                for i in arretrati_tbd:
+
+                    #controllo se il file e' stato inviato dal ricevitore
+                    
+                    file_tbd=rinex302filename(stz,i[0],session_interval,obs_freq,'MO',False,False,rinex_format,compression_format) #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
+                
+                    if os.path.exists('{}/{}/{}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_tbd)):
+                        print(i,'RINEX file present')
+                        query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=0, dw_failure_reason='file downloaded in a second time' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],stz)
+                        
+                        try:
+                            cur.execute(query)
+                        except:
+                            print('violazione chiave primaria.... scrivo nel log?')
+                        #estraggo converto da Hatanaka a YYO
+                        file_rnx=uncompressRinex(dir_path,'{}/{}/{}/'.format(folder_ftp,stz,ftp_interv_folder),file_tbd,compression_format,True)
+                        
+                        #sposto il file nella cartella di goGPS
+                        try:
+                            os.system('mv {}/{}/{}/{} {}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_rnx, dir_path, rnx_goGPS))
+                        except Exception as e:
+                            print('can not move the file to the goGPS folder for reason ',e)
+
+                    else:
+                        #non riesco trovo il rinex, quindi provo con il binario
+                        file_tbd=rinex302filename(stz,i[0],session_interval,obs_freq,'MO',False,True)
+                        
+                        if os.path.exists('{}/{}/{}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_tbd)): #se il file esiste
+                            print(i,'RINEX file not present, but .dat file present')
+                            conversione=dat2rinex('{}/{}/{}/'.format(folder_ftp,stz,ftp_interv_folder),file_tbd,3.04)
+                            if conversione==0:
+                                #file convertito correttamente, aggiorno il db
+
+                                query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=0, dw_failure_reason='file downloaded in a second time' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],stz)
+                                try:
+                                    cur.execute(query)
+                                except:
+                                    print('violazione chiave primaria.... scrivo nel log?')
+                                #sposto il file nella cartella di goGPS
+                                
+                                file_rnx=rinex302filename(stz,i,session_interval,obs_freq,'MO',False,False)
+                                try:
+                                    os.system('mv {}/{}/{}/{} {}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_rnx, dir_path, rnx_goGPS))
+                                except Exception as e:
+                                    print('can not move the file to the goGPS folder for reason ',e)
+                            else:
+                                query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'file downloaded but not converted into RINEX');" %(data_format,interval, i,stz,1)
+                                try:
+                                    cur.execute(query)
+                                except:
+                                    print('violazione chiave primaria.... scrivo nel log?')
+                        else:
+                            #non riesco a trovare nemmeno il binario per la ragione e
+                            print(i,'RINEX file not present and also .dat file not present')
+                            query="UPDATE meteognss_ztd.log_dw_{}data_{} SET dw_failure_reason='{}' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,'non trovato neanche il file .dat',i[0],stz)
+                            #print(query)
+                            try:
+                                cur.execute(query)
+                            except:
+                                print('violazione chiave primaria.... scrivo nel log?')
+
+        else:
+            #SCARICO I FILE
+            #CONFRONTO LISTA FILE ATTESI CON LISTA FILE SU SERVER
+            
+            #if os.path.exists('{}/{}/{}'.format(folder_ftp,stz,ftp_interv_folder))): check su esistenza cartella
+
+            data_tot = os.listdir('{}/{}/{}'.format(folder_ftp,stz,ftp_interv_folder))
+            data_rinex = []
+
+            for i in data_tot:
+
+                if i.endswith(compression_format): #i rinex sono compressi in tar.gz
+                    data_rinex.append(i[12:23])
+                    #print(i[74:85])
+                else:
+                    continue
+
+            for i in list_tbd:
+
+                if i not in data_rinex:
+                    
+                    #non c'è il rinex, ma potrebbe esserci il binario
+                    #provo a scaricare il file binario
+                    file_tbd=rinex302filename(stz,i,session_interval,obs_freq,'MO',False,True)
+                                    
+                    if os.path.exists('{}/{}/{}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_tbd)): #se il file esiste
+                        print(i,'RINEX file not present, but .dat file present')
+                        conversione=dat2rinex('{}/{}/{}/'.format(folder_ftp,stz,ftp_interv_folder),file_tbd,3.04)
                         if conversione==0:
                             #file convertito correttamente, aggiorno il db
-                            query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=0, dw_failure_reason='file downloaded in a second time' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],Stazioni[1])
+
+                            query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw) VALUES ('%s', '%s',%d);" %(data_format,interval, i,stz,0)
                             try:
                                 cur.execute(query)
                             except:
                                 print('violazione chiave primaria.... scrivo nel log?')
-                        else:
-                            #problema nella conversione del file
-                            query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'file downloaded but not converted into RINEX');" %(data_format,interval, i,Stazioni[1],1)
+                            
+                            #sposto il file nella cartella di goGPS
+                            
+                            file_rnx=rinex302filename(stz,i,session_interval,obs_freq,'MO',False,False)
                             try:
-                                cur.execute(query)
-                            except:
-                                print('violazione chiave primaria.... scrivo nel log?')
-
-                    except Exception as e:
-                        #non riesco a scaricare nemmeno il binario per la ragione e
-                        query="UPDATE meteognss_ztd.log_dw_{}data_{} SET dw_failure_reason='{}' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval, str(e),i[0],Stazioni[1])
-                        #print(query)
-                        try:
-                            cur.execute(query)
-                        except:
-                            print('violazione chiave primaria.... scrivo nel log?')
-
-    else:
-        #SCARICO I FILE
-        #CONFRONTO LISTA FILE ATTESI CON LISTA FILE SU SERVER
-        ftp = ftplib.FTP('{}'.format(url_ftp))
-        ftp.login(user_ftp,pwd_ftp)
-        ftp.cwd('/www.gter.it/concerteaux_gnss/rawdata/{}/{}'.format(Stazioni[1],ftp_interv_folder))
-        data_tot = []
-        data_rinex = []
-
-        ftp.dir(data_tot.append)
-        for i in data_tot:
-            if i.endswith(compression_format): #i rinex sono compressi in tar.gz
-                data_rinex.append(i[74:85])
-            else:
-                continue
-        ftp.quit()
-
-        for i in list_tbd:
-
-            if i not in data_rinex:
-                print(i,'non presente, cerco il binario')
-                #non c'è il rinex, ma potrebbe esserci il binario
-                #provo a scaricare il file binario
-                file_tbd=rinex302filename(Stazioni[1],i,session_interval,obs_freq,'MO',False,True)
-                url='https://www.gter.it/concerteaux_gnss/rawdata/{}/{}/{}'.format(Stazioni[1],ftp_interv_folder,file_tbd)
-
-                try:
-                    wget.download(url, out=output_directory)
-                    print(i,'scaricato in binario')
-                    #file binario scaricato, lo devo convertire in RINEX
-                    conversione=dat2rinex(output_directory,file_tbd,3.04)
-
-                    if conversione==0:
-                        #file convertito correttamente, aggiorno il db
-                        query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw) VALUES ('%s', '%s',%d);" %(data_format,interval, i,Stazioni[1],0)
-                        try:
-                            cur.execute(query)
-                        except:
-                            print('violazione chiave primaria.... scrivo nel log?')
-                    else:
-                        query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'file downloaded but not converted into RINEX');" %(data_format,interval, i,Stazioni[1],1)
-                        try:
-                            cur.execute(query)
-                        except:
-                            print('violazione chiave primaria.... scrivo nel log?')
-                
-                except Exception as e:
-                    query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'%s');" %(data_format,interval, i,Stazioni[1],1,str(e))
+                                os.system('mv {}/{}/{}/{} {}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_rnx, dir_path, rnx_goGPS))
+                            except Exception as e:
+                                print('can not move the file to the goGPS folder for reason ',e)
                     
-                    try:
-                        cur.execute(query)
-                    except:
-                        print('violazione chiave primaria.... scrivo nel log?')
-                 
-            
-            elif i in data_rinex:
-                print(i,'presente')
-                file_tbd=rinex302filename(Stazioni[1],i,session_interval,obs_freq,'MO',False,False,rinex_format,compression_format) #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
-                
+                        else:
+                            query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'file downloaded but not converted into RINEX');" %(data_format,interval, i,stz,1)
+                            try:
+                                cur.execute(query)
+                            except:
+                                print('violazione chiave primaria.... scrivo nel log?')
+                    
+                    else: #se il file non esiste
+                        print(i,'RINEX file not present and also .dat file not present')
+                        
+                        query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'%s');" %(data_format,interval, i,stz,1,'non trovato neanche il file .dat')
+                        
+                        try:
+                            cur.execute(query)
+                        except:
+                            print('violazione chiave primaria.... scrivo nel log?')
+                            
+                elif i in data_rinex:
+                    print(i,'RINEX file present')
+                    file_tbd=rinex302filename(stz,i,session_interval,obs_freq,'MO',False,False,rinex_format,compression_format) #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
+                    
+                    #url='https://www.gter.it/concerteaux_gnss/rawdata/{}/{}/{}'.format(stz,ftp_interv_folder,file_tbd)
+                    
+                    if os.path.exists('{}/{}/{}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_tbd)): #se il file esiste
+                    
+                        query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw) VALUES ('%s', '%s',%d);" %(data_format,interval, i,stz,0)
+                        
+                        try:
+                            cur.execute(query)
+                        except:
+                            print('violazione chiave primaria.... scrivo nel log?')
+                        #estraggo converto da Hatanaka a YYO
+                        file_rnx=uncompressRinex(dir_path,'{}/{}/{}/'.format(folder_ftp,stz,ftp_interv_folder),file_tbd,compression_format,True)
+                        
+                        #sposto il file nella cartella di goGPS
+                        try:
+                            os.system('mv {}/{}/{}/{} {}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_rnx, dir_path, rnx_goGPS))
+                        except Exception as e:
+                            print('can not move the file to the goGPS folder for reason ',e)
+                    else: #se non esiste o non riesco ad accedere alla cartella
+                        query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw) VALUES ('%s', '%s',%d);" %(data_format,interval, i,stz,1)
+                    
+                        try:
+                            cur.execute(query)
+                        except:
+                            print('violazione chiave primaria.... scrivo nel log?')
 
-                url='https://www.gter.it/concerteaux_gnss/rawdata/{}/{}/{}'.format(Stazioni[1],ftp_interv_folder,file_tbd)
-                
-                try:
-                    wget.download(url, out=output_directory)
-                    uncompressRinex(output_directory,file_tbd,compression_format,False)
-                    query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw) VALUES ('%s', '%s',%d);" %(data_format,interval, i,Stazioni[1],0)
-                    try:
-                        cur.execute(query)
-                    except:
-                        print('violazione chiave primaria.... scrivo nel log?')
 
-                except Exception as e:
-                    #print("Could not download for reason ",str(e))
-                    print('non fatto',e)
-                    query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'%s');" %(data_format,interval, i,Stazioni[1],1,str(e))
-
-                    try:
-                        cur.execute(query)
-                    except:
-                        print('violazione chiave primaria.... scrivo nel log?')
                  
     cur.close()
     conn.close()
         #time.sleep(600) #10 minuti
+    print('\n********** Downloaded all Data ^_^ **********\n')
 
-
+    print('End Script ',datetime.now())
 
 if __name__ == "__main__":
     main()
