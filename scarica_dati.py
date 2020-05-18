@@ -375,7 +375,7 @@ def main():
         if len(list_tbd)==0:
             #CERCO DI SCARICARE FILE CHE NON SONO STATI SCARICATI IN PRECEDENZA
             # seleziono solo gli ultimi 24 file non scaricati (da decidere se 24 è un numero che può andare)
-            query="SELECT rinex_data FROM meteognss_ztd.log_dw_{}data_{} where staz='{}' and cod_dw != 0 order by rinex_data desc limit 24;".format(data_format,interval,st)
+            query="SELECT rinex_data FROM meteognss_ztd.log_dw_{}data_{} where staz='{}' and cod_dw != 0 order by rinex_data desc limit 24;".format(data_format,interval,stz)
             try:
                 cur.execute(query)
             except:
@@ -393,7 +393,7 @@ def main():
                     file_tbd=rinex302filename(stz,i[0],session_interval,obs_freq,'MO',False,False,rinex_format,compression_format) #intervallo di registrazione va espresso in minuti (60 o 1440), frequenza va espressa in secondi
                 
                     if os.path.exists('{}/{}/{}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_tbd)):
-                        print(i,'RINEX file present')
+                        print(i[0],'RINEX file present')
                         query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=0, dw_failure_reason='file downloaded in a second time' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],stz)
                         
                         try:
@@ -414,7 +414,7 @@ def main():
                         file_tbd=rinex302filename(stz,i[0],session_interval,obs_freq,'MO',False,True)
                         
                         if os.path.exists('{}/{}/{}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_tbd)): #se il file esiste
-                            print(i,'RINEX file not present, but .dat file present')
+                            print(i[0],'RINEX file not present, but .dat file present')
                             conversione=dat2rinex('{}/{}/{}/'.format(folder_ftp,stz,ftp_interv_folder),file_tbd,3.04)
                             if conversione==0:
                                 #file convertito correttamente, aggiorno il db
@@ -439,7 +439,7 @@ def main():
                                     print('violazione chiave primaria.... scrivo nel log?')
                         else:
                             #non riesco a trovare nemmeno il binario per la ragione e
-                            print(i,'RINEX file not present and also .dat file not present')
+                            print(i[0],'RINEX file not present and also .dat file not present')
                             query="UPDATE meteognss_ztd.log_dw_{}data_{} SET dw_failure_reason='{}' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,'non trovato neanche il file .dat',i[0],stz)
                             #print(query)
                             try:
