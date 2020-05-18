@@ -8,6 +8,7 @@ import datetime
 import psycopg2
 from credenziali import *
 from datetime import datetime
+import scarica_dati
 
 def getObsIGS(station,year,doy):
     '''
@@ -170,6 +171,22 @@ def uploadZTDtoDB(connection_param,table,year,doy):
 
 
 
+'''
+conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
+conn.set_session(autocommit=True)
+cur = conn.cursor()
+query= "SELECT cod FROM concerteaux.stazioni_lowcost WHERE operativa=True"
+try:
+    cur.execute(query)
+except Exception as e:
+    print('errore: ',e)
+Stazioni=[i[0] for i in cur.fetchall()] 
+
+cur.close()
+conn.close()
+'''
+Stazioni=['BEAN','CAMA','AIGI','XXMG','SAOR']
+#print(Stazioni)
 anno=2019
 
 giorno=319
@@ -178,10 +195,30 @@ stazioni=['gras','geno','ieng']
 
 connection=[ip,db,user,pwd,port]  
 
+now=datetime.now()
+dir_path = os.path.dirname(os.path.realpath(__file__))
+print(dir_path)
+day_of_year = datetime.utcnow().utctimetuple().tm_yday
+year=datetime.utcnow().utctimetuple().tm_year
+hour=datetime.utcnow().utctimetuple().tm_hour
+hour_start=hour-1
+months=datetime.utcnow().utctimetuple().tm_mon
+days=datetime.utcnow().utctimetuple().tm_mday
+minutes=datetime.utcnow().utctimetuple().tm_min
+print(now)
+print(year)
+print(day_of_year)
+starting_time=str(year)+str(day_of_year)+'0000'
+print(starting_time)
+rinex_to_process=[scarica_dati.rinex302filename(s,starting_time,1440,30,'MO',False,False) for s in Stazioni]
+
+print(rinex_to_process)
+
 #rinex_in=[getObsIGS(i,anno,giorno) for i in stazioni]
 
-inifile_path='./test_automatiz/config/elab_partenza.ini'
-
+inifile_path='{}/test_automatiz/config/elab_partenza.ini'.format(dir_path)
+print(inifile_path)
+sys.exit()
 #new_ini_file=modifyINIfile(inifile_path,giorno,anno)
 
 #launchgoGPS(new_ini_file)
