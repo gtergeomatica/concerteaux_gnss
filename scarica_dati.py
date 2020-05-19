@@ -416,6 +416,7 @@ def main():
                         if os.path.exists('{}/{}/{}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_tbd)): #se il file esiste
                             print(i[0],'RINEX file not present, but .dat file present')
                             conversione=dat2rinex('{}/{}/{}/'.format(folder_ftp,stz,ftp_interv_folder),file_tbd,3.04)
+                            
                             if conversione==0:
                                 #file convertito correttamente, aggiorno il db
 
@@ -426,13 +427,14 @@ def main():
                                     print('violazione chiave primaria.... scrivo nel log?')
                                 #sposto il file nella cartella di goGPS
                                 
-                                file_rnx=rinex302filename(stz,i,session_interval,obs_freq,'MO',False,False)
+                                file_rnx=rinex302filename(stz,i[0],session_interval,obs_freq,'MO',False,False)
                                 try:
                                     os.system('mv {}/{}/{}/{} {}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_rnx, dir_path, rnx_goGPS))
                                 except Exception as e:
                                     print('can not move the file to the goGPS folder for reason ',e)
                             else:
-                                query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'file downloaded but not converted into RINEX');" %(data_format,interval, i,stz,1)
+                                
+                                query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=1, dw_failure_reason='file downloaded but not converted into RINEX' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],stz)
                                 try:
                                     cur.execute(query)
                                 except:
