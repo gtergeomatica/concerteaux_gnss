@@ -451,7 +451,7 @@ def main():
                             #non riesco a trovare nemmeno il binario per la ragione e
                             print(i[0],'RINEX file not present and also .dat file not present')
                             messaggio='STAZIONE {}, file {}.\n Non presente nè il file RINEX, nè il file .dat'.format(stz,i[0])
-                            ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
+                            #ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
                             query="UPDATE meteognss_ztd.log_dw_{}data_{} SET dw_failure_reason='{}' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,'non trovato neanche il file .dat',i[0],stz)
                             #print(query)
                             try:
