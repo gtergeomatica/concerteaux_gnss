@@ -14,6 +14,7 @@ from credenziali import *
 import getopt
 import urllib.request
 import ftplib
+import ConcerteauxGNSS_bot
 #passi da fare
 
 #1. controllare che il dato ci sia e nel caso scaricarlo. Se il dato non ci fosse scrivere su un file di log
@@ -398,8 +399,10 @@ def main():
                         
                         try:
                             cur.execute(query)
-                        except:
-                            print('violazione chiave primaria.... scrivo nel log?')
+                        except Exception as e:
+                            messaggio='STAZIONE {}, file {}.\n Errore update tabella nel db: {}'.format(stz,i[0],e)
+                            ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
+                        
                         #estraggo converto da Hatanaka a YYO
                         file_rnx=uncompressRinex(dir_path,'{}/{}/{}/'.format(folder_ftp,stz,ftp_interv_folder),file_tbd,compression_format,True)
                         
@@ -407,7 +410,9 @@ def main():
                         try:
                             os.system('mv {}/{}/{}/{} {}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_rnx, dir_path, rnx_goGPS))
                         except Exception as e:
-                            print('can not move the file to the goGPS folder for reason ',e)
+                            messaggio='STAZIONE {}, file {}.\n Errore nello spostamento file RINEX: {}'.format(stz,i[0],e)
+                            ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
+                            #print('can not move the file to the goGPS folder for reason ',e)
 
                     else:
                         #non riesco trovo il rinex, quindi provo con il binario
@@ -423,31 +428,37 @@ def main():
                                 query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=0, dw_failure_reason='file downloaded in a second time' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],stz)
                                 try:
                                     cur.execute(query)
-                                except:
-                                    print('violazione chiave primaria.... scrivo nel log?')
+                                except Exception as e:
+                                    messaggio='STAZIONE {}, file {}.\n Errore update tabella nel db: {}'.format(stz,i[0],e)
+                                    ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
                                 #sposto il file nella cartella di goGPS
                                 
                                 file_rnx=rinex302filename(stz,i[0],session_interval,obs_freq,'MO',False,False)
                                 try:
                                     os.system('mv {}/{}/{}/{} {}/{}'.format(folder_ftp,stz,ftp_interv_folder,file_rnx, dir_path, rnx_goGPS))
                                 except Exception as e:
-                                    print('can not move the file to the goGPS folder for reason ',e)
+                                    messaggio='STAZIONE {}, file {}.\n Errore nello spostamento file RINEX: {}'.format(stz,i[0],e)
+                                    ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
                             else:
                                 
                                 query="UPDATE meteognss_ztd.log_dw_{}data_{} SET cod_dw=1, dw_failure_reason='file downloaded but not converted into RINEX' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,i[0],stz)
                                 try:
                                     cur.execute(query)
-                                except:
-                                    print('violazione chiave primaria.... scrivo nel log?')
+                                except Exception as e:
+                                    messaggio='STAZIONE {}, file {}.\n Errore update tabella nel db: {}'.format(stz,i[0],e)
+                                    ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
                         else:
                             #non riesco a trovare nemmeno il binario per la ragione e
                             print(i[0],'RINEX file not present and also .dat file not present')
+                            messaggio='STAZIONE {}, file {}.\n Non presente nè il file RINEX, nè il file .dat'.format(stz,i[0])
+                            ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
                             query="UPDATE meteognss_ztd.log_dw_{}data_{} SET dw_failure_reason='{}' WHERE rinex_data='{}' and staz='{}';".format(data_format,interval,'non trovato neanche il file .dat',i[0],stz)
                             #print(query)
                             try:
                                 cur.execute(query)
-                            except:
-                                print('violazione chiave primaria.... scrivo nel log?')
+                            except Exception as e:
+                                messaggio='STAZIONE {}, file {}.\n Errore update tabella nel db: {}'.format(stz,i[0],e)
+                                ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
 
         else:
             #SCARICO I FILE
@@ -483,8 +494,9 @@ def main():
                             query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw) VALUES ('%s', '%s',%d);" %(data_format,interval, i,stz,0)
                             try:
                                 cur.execute(query)
-                            except:
-                                print('violazione chiave primaria.... scrivo nel log?')
+                            except Exception as e:
+                                messaggio='STAZIONE {}, file {}.\n Errore insert tabella nel db: {}'.format(stz,i,e)
+                                ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
                             
                             #sposto il file nella cartella di goGPS
                             
@@ -495,14 +507,19 @@ def main():
                                 print('can not move the file to the goGPS folder for reason ',e)
                     
                         else:
+                            messaggio='STAZIONE {}, file {}.\n Errore nella conversione da .dat a RINEX'.format(stz,i)
+                            ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
+
                             query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'file downloaded but not converted into RINEX');" %(data_format,interval, i,stz,1)
                             try:
                                 cur.execute(query)
-                            except:
-                                print('violazione chiave primaria.... scrivo nel log?')
+                            except Exception as e:
+                                messaggio='STAZIONE {}, file {}.\n Errore insert tabella nel db: {}'.format(stz,i,e)
+                                ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
                     
                     else: #se il file non esiste
-                        print(i,'RINEX file not present and also .dat file not present')
+                        messaggio='STAZIONE {}, file {}.\n Non è stato mandato nè il file RINEX nè il file .dat'.format(stz,i)
+                        ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
                         
                         query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'%s');" %(data_format,interval, i,stz,1,'non trovato neanche il file .dat')
                         
@@ -523,8 +540,10 @@ def main():
                         
                         try:
                             cur.execute(query)
-                        except:
-                            print('violazione chiave primaria.... scrivo nel log?')
+                        except Exception as e:
+                            messaggio='STAZIONE {}, file {}.\n Errore insert tabella nel db: {}'.format(stz,i,e)
+                            ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
+                        
                         #estraggo converto da Hatanaka a YYO
                         file_rnx=uncompressRinex(dir_path,'{}/{}/{}/'.format(folder_ftp,stz,ftp_interv_folder),file_tbd,compression_format,True)
                         
