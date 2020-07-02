@@ -171,11 +171,18 @@ def dat2rinex(path,binfile,rinex_version):
     The function returns 0 if the conversion succeed; if the conversion 
     doesn't succeed the function returns a string with the error raised
     '''
-    os.system('/opt/NovAtel\ Inc/NovAtel\ Convert/NovAtelConvert -r{} {}{}'.format(rinex_version,path,binfile))
-        
+    
+    #p=os.system('export DISPLAY=:0')
+    #print(p)
+    # export DISPLAY=:0 è istruzione necessaria per far funzionare SW di Novatel che richiede interfaccia grafica
+    #os.environ["DISPLAY"] = ":0"
+    
+    conversion=os.system('/opt/NovAtel\ Inc/NovAtel\ Convert/NovAtelConvert -r{} {}{}'.format(rinex_version,path,binfile))
+    print(conversion)    
     nav_files=[i for i in os.listdir(path) if not i.endswith('O') and not i.endswith('dat') and not i.endswith('gz') and not i.endswith('zip') and not i.endswith('rnx')]
     obs_file=[i[:-3] for i in os.listdir(path) if i.endswith('O')]
-    
+    #print('input file: ',binfile[:-3])
+    #print('cartella con .yyO file: ',obs_file)
     if binfile[:-3] in obs_file:
         conv_status=0
     else:
@@ -255,8 +262,9 @@ def uncompressRinex(dir_path,path,rinexfile,compression,hatanaka=True):
 #### MAIN ####
 def main():
 
-
+    
     print('\nStart script ',datetime.now())
+    
     try:
         interval=sys.argv[1]
     except:
@@ -271,7 +279,7 @@ def main():
     
     
     
-    Data_installazione='20201220000' #(format YYYYDDDHHMM, where DDD= day of the year)
+    Data_installazione='20201720000' #(format YYYYDDDHHMM, where DDD= day of the year)
     
     
 
@@ -361,11 +369,11 @@ def main():
 
         #print('prima while',inizio==fine)
         if inizio != fine:
-            inizio+=timedelta(hours=1)#per non includere nella lista da scaricare l'ultimo file scaricato
+            inizio+=timedelta(hours=24)#per non includere nella lista da scaricare l'ultimo file scaricato
             while inizio!=fine:
                 #print('dentro while')
                 list_tbd.append(inizio.strftime('%Y%j%H%M'))
-                inizio+=timedelta(hours=1)
+                inizio+=timedelta(hours=24)
             list_tbd.append(fine.strftime('%Y%j%H%M')) #per includere nella lista file da scaricare l'ultimo
 
         print('file to be downloaded ',list_tbd)
@@ -507,7 +515,7 @@ def main():
                                 print('can not move the file to the goGPS folder for reason ',e)
                     
                         else:
-                            messaggio='STAZIONE {}, file {}.\n Errore nella conversione da .dat a RINEX'.format(stz,i)
+                            messaggio='STAZIONE {}, file {}.\n Errore nella conversione da .dat a RINEX. Conversione= {}'.format(stz,i,conversione)
                             ConcerteauxGNSS_bot.telegram_bot_sendtext(messaggio,chatID_lorenzo)
 
                             query="INSERT INTO meteognss_ztd.log_dw_%sdata_%s (rinex_data,staz,cod_dw,dw_failure_reason) VALUES ('%s', '%s',%d,'file downloaded but not converted into RINEX');" %(data_format,interval, i,stz,1)

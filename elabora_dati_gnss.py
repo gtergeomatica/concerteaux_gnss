@@ -7,7 +7,7 @@ import sys,os
 import datetime
 import psycopg2
 from credenziali import *
-from datetime import datetime
+from datetime import datetime, timedelta
 import scarica_dati
 
 def getObsIGS(station,year,doy):
@@ -33,7 +33,7 @@ def getObsIGS(station,year,doy):
     return obsfile[:-2]
     
 
-def modifyINIfile(inifile,doy,anno):
+def modifyINIfile(goGPSproject,doy,anno):
     '''
     function to modify the configuration file for elaboration with goGPS
 
@@ -50,7 +50,7 @@ def modifyINIfile(inifile,doy,anno):
      '''
     oldfilelines=[]
     newINIfilelines=[]
-    with open(inifile, 'r') as configfile:
+    with open('{}/config/elab_partenza.ini'.format(goGPSproject), 'r') as configfile:
         oldfilelines=configfile.readlines()
 
     print(oldfilelines[49][0:14])
@@ -60,31 +60,31 @@ def modifyINIfile(inifile,doy,anno):
         #modify session date
         #start
         if i[0:14]=='sss_date_start':
-            start_time= datetime.datetime(anno, 1, 1) + datetime.timedelta(doy - 1)
+            start_time= datetime(anno, 1, 1) + timedelta(doy - 1)
             newstring ='sss_date_start = "{}-{}-{} 00:00:00"\n'.format(start_time.strftime("%Y"),start_time.strftime("%m"),start_time.strftime("%d"))
             newINIfilelines.append(newstring)
 
         #modify session date
         #stop       
         elif i[0:14]=='sss_date_stop ':
-            stop_time= datetime.datetime(anno, 1, 1) + datetime.timedelta(doy - 1)
+            stop_time= datetime(anno, 1, 1) + timedelta(doy - 1)
             newstring ='sss_date_stop = "{}-{}-{} 23:59:59"\n'.format(start_time.strftime("%Y"),start_time.strftime("%m"),start_time.strftime("%d"))
             newINIfilelines.append(newstring)        
         
         else:
             newINIfilelines.append(i)
     
-    prject_path='/home/lorenzo/concerteaux_gnss/test_automatiz/config/' #use absolute path
+    project_conf='{}/config/'.format(goGPSproject) #use absolute path
     newINIfile='elab_{}_{}.ini'.format(anno,doy)
     
-    with open ('{}{}'.format(prject_path,newINIfile),'a') as newfile:
+    with open ('{}{}'.format(project_conf,newINIfile),'a') as newfile:
         for line in newINIfilelines:
             newfile.write(line)
     
-    return('{}{}'.format(prject_path,newINIfile))
+    return('{}{}'.format(project_conf,newINIfile))
    
         
-def launchgoGPS(inifile):
+def launchgoGPS(goGPSpath,inifile):
     '''
     function to excecute goGPS with a ini file and with no GUI
     The function writes a simple matlab script containg some istructions 
@@ -98,7 +98,7 @@ def launchgoGPS(inifile):
     
     with open ('launch_goGPStemp.m','a') as setfile:
         setfile.write('clear all\nclose all\n')
-        setfile.write('cd \'/home/lorenzo/source_codes/goGPS_MATLAB/goGPS\'\n')
+        setfile.write('cd {}\n'.format(goGPSpath))
         setfile.write('goGPS(\'{}\',0);\n'.format(inifile))
         setfile.write('exit')       
         
@@ -133,7 +133,7 @@ def readData(path,filename):
         return
 
 
-def uploadZTDtoDB(connection_param,table,year,doy):
+def uploadZTDtoDB(goGPSproject,connection_param,table,year,doy):
     '''
     funtion to upload to DB ZTD data coming from goGPS elaboration
     the function needs:
@@ -146,8 +146,24 @@ def uploadZTDtoDB(connection_param,table,year,doy):
     '''
     print(connection_param)
     print(table)
-    out_path='./test_automatiz/out/{}/{}/'.format(year,doy)
-    ztd_file=[f for f in os.listdir(out_path)]
+    out_path='{}/out/{}/{}/'.format(goGPSproject,year,doy)
+    try:
+        ztd_file=[f for f in os.listdir(out_path)]
+    except:
+        # in questo caso non e' stata processata nessuna stazione
+        conn = psycopg2.connect(host=connection_param[0], dbname=connection_param[1], user=connection_param[2], password=connection_param[3], port=connection_param[4])
+        #autocommit
+        conn.set_session(autocommit=True)
+        cur = conn.cursor()
+        query1='SELECT cod FROM concerteaux.stazioni_lowcost;'
+        cur.execute(query1)
+        stzn=[i[0] for i in cur.fetchall()]
+        queries=['INSERT INTO meteognss_ztd.log_ztd_elaborations(id_station, year, doy, processed) VALUES (\'{}\', {}, {}, False)'.format(i,year,doy) for i in stzn]
+        for q in queries:
+            cur.execute(q)
+        return
+    
+    
     ztd_station_name=[n[0:4] for n in ztd_file]
     ztd_data=[readData(out_path,z) for z in ztd_file]
     
@@ -159,19 +175,30 @@ def uploadZTDtoDB(connection_param,table,year,doy):
     for s,d in zip(ztd_station_name,range(len(ztd_data))):
         for z in ztd_data[d]:
             #print(s,z[0],z[1])
-            query="INSERT INTO meteognss_ztd.{} VALUES ('{}','{}',{}) ;".format(table,s,z[0],z[1])
+            query1="INSERT INTO meteognss_ztd.{} VALUES ('{}','{}',{}) ;".format(table,s,z[0],z[1])
             try:
-                cur.execute(query)
+                cur.execute(query1)
+                
             except Exception as e:
                 print('error: ',e)
+        query2='INSERT INTO meteognss_ztd.log_ztd_elaborations(id_station, year, doy, processed) VALUES (\'{}\', {}, {}, True)'.format(s,year,doy)
+        try:
+            cur.execute(query2)
+        except Exception as e:
+            print('error: ',e)
     cur.close()
     conn.close()
 
+    #rimuovo cartella con risultati elaborazione?
+    os.system('rm -r {}'.format(out_path))
 
 
 
 
-'''
+
+goGPSpath='/home/gter/REPOSITORY/goGPS_MATLAB/goGPS'
+goGPSproject='{}/ZTD_elaborations'.format(os.path.dirname(os.path.realpath(__file__)))
+
 conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
 conn.set_session(autocommit=True)
 cur = conn.cursor()
@@ -184,20 +211,20 @@ Stazioni=[i[0] for i in cur.fetchall()]
 
 cur.close()
 conn.close()
-'''
-Stazioni=['BEAN','CAMA','AIGI','XXMG','SAOR']
+
+print(Stazioni)
+
 #print(Stazioni)
-anno=2019
+#anno=2020
 
-giorno=319
+#giorno=180
 
-stazioni=['gras','geno','ieng']
 
 connection=[ip,db,user,pwd,port]  
 
 now=datetime.now()
 dir_path = os.path.dirname(os.path.realpath(__file__))
-print(dir_path)
+
 day_of_year = datetime.utcnow().utctimetuple().tm_yday
 year=datetime.utcnow().utctimetuple().tm_year
 hour=datetime.utcnow().utctimetuple().tm_hour
@@ -205,22 +232,21 @@ hour_start=hour-1
 months=datetime.utcnow().utctimetuple().tm_mon
 days=datetime.utcnow().utctimetuple().tm_mday
 minutes=datetime.utcnow().utctimetuple().tm_min
-print(now)
-print(year)
-print(day_of_year)
+#print(now)
+#print(year)
+#print(day_of_year)
 starting_time=str(year)+str(day_of_year)+'0000'
-print(starting_time)
-rinex_to_process=[scarica_dati.rinex302filename(s,starting_time,1440,30,'MO',False,False) for s in Stazioni]
+#print(starting_time)
+day_to_process=day_of_year-4
+#rinex_to_process=[scarica_dati.rinex302filename(s,starting_time,1440,30,'MO',False,False) for s in Stazioni]
 
-print(rinex_to_process)
+print('Processing dei dati del giorno: {}, anno: {}'.format(day_to_process,year))
 
 #rinex_in=[getObsIGS(i,anno,giorno) for i in stazioni]
 
-inifile_path='{}/test_automatiz/config/elab_partenza.ini'.format(dir_path)
-print(inifile_path)
-sys.exit()
-#new_ini_file=modifyINIfile(inifile_path,giorno,anno)
 
-#launchgoGPS(new_ini_file)
-      
-uploadZTDtoDB(connection,'dati_test_temp',anno,giorno)
+new_ini_file=modifyINIfile(goGPSproject,day_to_process,year)
+
+launchgoGPS(goGPSpath,new_ini_file)
+
+uploadZTDtoDB(goGPSproject, connection,'ztd_bendola',year,day_to_process)
