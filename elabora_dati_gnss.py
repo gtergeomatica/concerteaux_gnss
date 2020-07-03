@@ -7,8 +7,10 @@ import sys,os
 import datetime
 import psycopg2
 from credenziali import *
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import scarica_dati
+from ftplib import FTP  
+
 
 def getObsIGS(station,year,doy):
     '''
@@ -98,13 +100,13 @@ def launchgoGPS(goGPSpath,inifile):
     
     with open ('launch_goGPStemp.m','a') as setfile:
         setfile.write('clear all\nclose all\n')
-        setfile.write('cd {}\n'.format(goGPSpath))
+        setfile.write('cd {}/goGPS\n'.format(goGPSpath))
         setfile.write('goGPS(\'{}\',0);\n'.format(inifile))
         setfile.write('exit')       
         
     os.system('matlab -r launch_goGPStemp')
     os.system('rm launch_goGPStemp.m')
-        
+    
         
 def readData(path,filename):
     '''
@@ -192,11 +194,81 @@ def uploadZTDtoDB(goGPSproject,connection_param,table,year,doy):
     #rimuovo cartella con risultati elaborazione?
     os.system('rm -r {}'.format(out_path))
 
+def __date2weeksday(date, start):
+    """Convert date to spent weeks and day of week from a start date."""
+    delta = date - start
+    if delta.days >= 0:
+        weeks = delta.days // 7
+        dayofweek = delta.days % 7
+        return weeks, dayofweek
+    else:
+        raise ValueError('Invalid date: %s, too early.' %date)
+
+def date2gpswd(date):
+    """Convert date to GPS week and day of week, return int tuple (week, day).
+    Example:
+    >>> from datetime import date
+    >>> date2gpswd(date(2017, 5, 17))
+    (1949, 3)
+    >>> date2gpswd(date(1917, 5, 17))
+    Traceback (most recent call last):
+    ...
+    ValueError: Invalid date: 1917-05-17, too early.
+    """
+    return __date2weeksday(date, GPS_START_DATE)
+
+def doy2weeksday(doy, year):
+    '''function to convert year and doy into gpsweek and dow'''
+    
+    datamy=datetime(year, 1, 1) + timedelta(doy - 1)
+
+    #print(type(date(year,datamy.month,datamy.day)))
+    pippo=date2gpswd(date(year,datamy.month,datamy.day))
+    print(pippo)
+
+
+def rmEphemerides (goGPSpath, doy,year):
+    
+    #cerco la settimana e il giorno GPS
+    datamy=datetime(year, 1, 1) + timedelta(doy - 1)
+    gpsweek=date2gpswd(date(year,datamy.month,datamy.day))[0]
+    
+    eph_path=goGPSpath+'/data/satellite/EPH/'+str(gpsweek)
+    
+    if os.path.exists(eph_path):
+        os.system('rm -r {}'.format(eph_path))
+    else:
+        print(eph_path+' does not exist')
+
+def rmCLK (goGPSpath, doy,year):
+    
+    #cerco la settimana e il giorno GPS
+    datamy=datetime(year, 1, 1) + timedelta(doy - 1)
+    gpsweek=date2gpswd(date(year,datamy.month,datamy.day))[0]
+    
+    clk_path=goGPSpath+'/data/satellite/CLK/'+str(gpsweek)
+    
+    if os.path.exists(clk_path):
+        os.system('rm -r {}'.format(clk_path))
+    else:
+        print(clk_path+' does not exist')    
+
+
+def upload2ftpserver(local_folder, remote_folder, file):
+
+    ftp = FTP(url_ftp)  
+    ftp.login(user_ftp, pwd_ftp) 
+
+    with open('{}/{}'.format(local_folder,file), 'rb') as f:  
+        ftp.storbinary('STOR %s' % '{}/{}'.format(remote_folder,file), f)  
+    ftp.quit()
 
 
 
 
-goGPSpath='/home/gter/REPOSITORY/goGPS_MATLAB/goGPS'
+#### MAIN ####
+
+goGPSpath='/home/gter/REPOSITORY/goGPS_MATLAB'
 goGPSproject='{}/ZTD_elaborations'.format(os.path.dirname(os.path.realpath(__file__)))
 
 conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
@@ -214,39 +286,53 @@ conn.close()
 
 print(Stazioni)
 
-#print(Stazioni)
-#anno=2020
-
-#giorno=180
-
-
 connection=[ip,db,user,pwd,port]  
 
 now=datetime.now()
 dir_path = os.path.dirname(os.path.realpath(__file__))
-
+GPS_START_DATE = date(1980, 1, 6)
 day_of_year = datetime.utcnow().utctimetuple().tm_yday
 year=datetime.utcnow().utctimetuple().tm_year
-hour=datetime.utcnow().utctimetuple().tm_hour
-hour_start=hour-1
-months=datetime.utcnow().utctimetuple().tm_mon
-days=datetime.utcnow().utctimetuple().tm_mday
-minutes=datetime.utcnow().utctimetuple().tm_min
-#print(now)
-#print(year)
-#print(day_of_year)
+
+
 starting_time=str(year)+str(day_of_year)+'0000'
-#print(starting_time)
+
 day_to_process=day_of_year-4
-#rinex_to_process=[scarica_dati.rinex302filename(s,starting_time,1440,30,'MO',False,False) for s in Stazioni]
 
 print('Processing dei dati del giorno: {}, anno: {}'.format(day_to_process,year))
 
-#rinex_in=[getObsIGS(i,anno,giorno) for i in stazioni]
+
 
 
 new_ini_file=modifyINIfile(goGPSproject,day_to_process,year)
 
 launchgoGPS(goGPSpath,new_ini_file)
+#controllo stato della soluzione
 
-uploadZTDtoDB(goGPSproject, connection,'ztd_bendola',year,day_to_process)
+if os.path.exists(goGPSproject+'/out/{}/{}'.format(year,day_to_process)):
+    #qualcosa è stato prodotto come output
+    #rimuovo le effemeridi, i file CLK, ERP
+    rmEphemerides(goGPSpath, day_to_process,year)
+    rmCLK(goGPSpath, day_to_process,year)
+    #sposto il log su aruba 
+    logs=os.listdir('{}/out/log'.format(goGPSproject))
+    logs.sort() # list of logs file sorted from the elder to the newer (based on filenames)
+    upload2ftpserver('{}/out/log'.format(goGPSproject),'/www.gter.it/concerteaux_gnss/ztd_elaborations/log',logs[-1])
+    os.system('rm {}/out/log/{}'.format(goGPSproject, logs[-1]))
+
+    #rimuovo i RINEX
+    # Carico i dati elaborati in formato CSV sul aruba
+    elab=os.listdir('./ZTD_elaborations/out/{}/{}'.format(year,day_to_process))
+    for i in elab:
+        upload2ftpserver('./ZTD_elaborations/out/{}/{}'.format(year,day_to_process),'/www.gter.it/concerteaux_gnss/ztd_elaborations/output',i)
+        
+
+    # Carico i dati elaborati sul DB e li rimuovo dalla cartella locale
+    uploadZTDtoDB(goGPSproject, connection,'ztd_bendola',year,day_to_process)
+
+    
+else:
+    print('case to be implemented')
+
+
+
