@@ -146,9 +146,10 @@ def uploadZTDtoDB(goGPSproject,connection_param,table,year,doy):
     (this uploading function regards daily ZTD elaborations) 
    
     '''
-    print(connection_param)
-    print(table)
+    #print(connection_param)
+    #print(table)
     out_path='{}/out/{}/{}/'.format(goGPSproject,year,doy)
+
     try:
         ztd_file=[f for f in os.listdir(out_path)]
     except:
@@ -165,8 +166,12 @@ def uploadZTDtoDB(goGPSproject,connection_param,table,year,doy):
             cur.execute(q)
         return
     
+
     
     ztd_station_name=[n[0:4] for n in ztd_file]
+
+    print (ztd_station_name)
+    
     ztd_data=[readData(out_path,z) for z in ztd_file]
     
     #connection to the DB
@@ -297,8 +302,11 @@ year=datetime.utcnow().utctimetuple().tm_year
 
 starting_time=str(year)+str(day_of_year)+'0000'
 
-day_to_process=day_of_year-4
+day_to_process=day_of_year-5
+#day_to_process=274
 
+#uploadZTDtoDB(goGPSproject, connection,'ztd_bendola',year,day_to_process)
+#sys.exit()
 print('Processing dei dati del giorno: {}, anno: {}'.format(day_to_process,year))
 
 
@@ -322,9 +330,9 @@ if os.path.exists(goGPSproject+'/out/{}/{}'.format(year,day_to_process)):
 
     #rimuovo i RINEX
     # Carico i dati elaborati in formato CSV sul aruba
-    elab=os.listdir('./ZTD_elaborations/out/{}/{}'.format(year,day_to_process))
+    elab=os.listdir('{}/out/{}/{}'.format(goGPSproject, year,day_to_process))
     for i in elab:
-        upload2ftpserver('./ZTD_elaborations/out/{}/{}'.format(year,day_to_process),'/www.gter.it/concerteaux_gnss/ztd_elaborations/output',i)
+        upload2ftpserver('{}/out/{}/{}'.format(goGPSproject, year,day_to_process),'/www.gter.it/concerteaux_gnss/ztd_elaborations/output',i)
         
 
     # Carico i dati elaborati sul DB e li rimuovo dalla cartella locale
