@@ -54,3 +54,67 @@ sudo nano /etc/crontab
 # aggiungere riga
 1-59/* * * * lorenzo /usr/bin/python3 /percorso_assoluto_script/scarica_dati.py hour rinex > /tmp/file_log.txt
 ```
+
+
+
+Bot telegram
+------------------------------------------------------------------
+
+servono le librerie telepot e emoji che si possono installare con pip3
+
+e.g.
+```
+sudo pip3 install telepot
+```
+
+Il bot telegram è sempre in ascolto. 
+Parte all'avvio del server grazie allo script sh avvio_bot.sh che va personalizzato e che va messo in `/etc/init.d/`
+
+
+Loggandosi come utente sudo 
+1) fare un link degli script in /etc/init.d/ 
+2) assegnare i permessi
+3) impostare come script di avvio
+
+```
+ln -s $(pwd)/avvio_bot.sh /etc/init.d/
+chmod +x /etc/init.d/avvio_bot.sh
+update-rc.d avvio_bot.sh defaults
+```
+
+Il bot si serve di un file credenziali.py che per ovvie ragioni non è caricato suò repository e che ha questo formato :
+
+```
+ip='server_host or IP'
+db='nome_db'
+user='user'
+pwd='password'
+port='5432' # or different port
+
+
+#server aruba
+user_ftp='XXXXXXXX@aruba.it'
+pwd_ftp='XXXXXXXXX'
+url_ftp='ftp.dominio'
+
+# cartella montata su gishosting
+folder_ftp='/mnt/dav/concerteaux/gnss/rawdata'
+
+rnx_goGPS='ZTD_elaborations/RINEX'
+
+
+bot_token='XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' #bot per notifiche file scaricati
+chatID_lorenzo='XXXXXXXXX'
+
+link='https://www.gishosting.gter.it/concerteaux'
+```
+
+
+sono stati impostati 3 comandi:
+\telegram_id
+\webgis
+\stato_stazioni
+
+così come tre tasti analoghi qualora non si usi un comando riconosciuto dal bot
+
+Il bot è gestito dal comando **bot_multithread.py**

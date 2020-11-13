@@ -2,3 +2,7 @@ credenziali.py
 downloaded_raw_data/CAMA/binary/*
 downloaded_raw_data/CAMA/rinex/*
 
+goGPSproject/RINEX/*
+goGPSproject/RINEX_day_temp/*
+ZTD_elaborations/*
+

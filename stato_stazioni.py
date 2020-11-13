@@ -93,7 +93,7 @@ def main():
     conn.close()
 
     # da mettere ciclo con chatID UNIGE oppure da fare roba analoga ma con comando dal bot
-    telegram_bot_sendtext(messaggio,chatID_lorenzo)
+    # telegram_bot_sendtext(messaggio,chatID_lorenzo)
     
 if __name__ == "__main__":
     main()
