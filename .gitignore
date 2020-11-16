@@ -6,3 +6,7 @@ goGPSproject/RINEX/*
 goGPSproject/RINEX_day_temp/*
 ZTD_elaborations/*
 
+
+bot.pid
+crash.log
+
