@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 # Copyleft Gter srl 2020
-# # -*- coding: utf-8 -*-
 # Roberto Marzocchi, Lorenzo Benvenuto
 
 
@@ -47,13 +48,28 @@ def telegram_bot_sendtext(bot_message,chat_id):
 
     return response.json()
 
-
-def main():
-
+def chatIDlist ():
+    '''
+    funzione che restituisce la lista con i chat ID di telegram salvati sul DB
+    '''
     conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
     conn.set_session(autocommit=True)
     cur = conn.cursor()
-    query='SELECT cod, host, port FROM concerteaux.stazioni_lowcost;'
+    query='SELECT telegram_id FROM concerteaux.telegram_utenti where valido =\'t\';'
+    try:
+        cur.execute(query)
+        cid=cur.fetchall()
+    except Exception as e:
+        logging.error(e)
+    return [i[0] for i in cid]
+    print(cid)
+
+def main():
+    
+    conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
+    conn.set_session(autocommit=True)
+    cur = conn.cursor()
+    query='SELECT cod, host, port, operativa FROM concerteaux.stazioni_lowcost order by cod;'
     try:
         cur.execute(query)
         stazioni=cur.fetchall()
@@ -62,9 +78,31 @@ def main():
 
     logging.debug(query)
     logging.debug(stazioni)
+    print(type(stazioni[0][-1]))
+    if stazioni[0][-1]:
+        status_old='t'
+    else:
+        status_old='f'
+    print(status_old)
+    operativo_old={}
+    for j in stazioni:
+        print(j[-1])
+        if j[-1]:
+            
+            status_old='t'
+        else:
+           
+            status_old='f'
+        
+        operativo_old[j[0]]=status_old
+    #print(operativo_old)
+    #sys.exit()
 
     #messaggio= "\033[1m"+'CONTROLLO OPERATIVITA\' STAZIONI GNSS\n\n'+"\033[0m"
     messaggio= 'CONTROLLO OPERATIVITA\' STAZIONI GNSS\n\n'
+    #messaggio_cambio='\xE2\x9A\xA0 ATTENZIONE: UNA O PIU\' STAZIONI HANNO CAMBIATO LO STATO DI ATTIVITA\': \n'
+    messaggio_cambio='{} ATTENZIONE: UNA O PIU\' STAZIONI HANNO CAMBIATO LO STATO DI ATTIVITA\': \n'.format(emoji.emojize(" :warning:", use_aliases=True))
+    send_cambio=False
     for s in stazioni:
         host='http://{}:{}'.format(s[1],s[2])
         status=station_on(host)
@@ -74,6 +112,19 @@ def main():
             
         elif status=='f':
             messaggio+='{}:  non operativa {}\n'.format(s[0], emoji.emojize(" :x:", use_aliases=True))
+
+        print(s[0], status)
+        print(operativo_old[s[0]])
+        if status==operativo_old[s[0]]:
+            logging.info('non è cambiato nulla')
+        else:
+            send_cambio=True
+            if status=='t':
+                logging.info('la stazione {} è diventata operativa'.format(s[0]))
+                messaggio_cambio+='la stazione {} è diventata operativa {}\n'.format(s[0],emoji.emojize(" :white_check_mark:", use_aliases=True))
+            elif status=='f':
+                logging.info('{} è diventata non operativa '.format(s[0]))
+                messaggio_cambio+='{} è diventata non operativa {}\n'.format(s[0],emoji.emojize(" :x:", use_aliases=True))
 
         logging.info(messaggio)
         cur2 = conn.cursor()
@@ -86,14 +137,17 @@ def main():
         except Exception as e:
             logging.error(e)
         cur2.close()
-
-
         
     cur.close()
     conn.close()
 
-    # da mettere ciclo con chatID UNIGE oppure da fare roba analoga ma con comando dal bot
+    
     # telegram_bot_sendtext(messaggio,chatID_lorenzo)
+    utenti_bot=chatIDlist()
+    if send_cambio:
+        for i in utenti_bot:
+            telegram_bot_sendtext(messaggio_cambio,i)
+        send_cambio=False
     
 if __name__ == "__main__":
     main()

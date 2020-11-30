@@ -107,6 +107,58 @@ def stato_stazioni():
     return messaggio
 
 
+
+def update_utenti_tgr(cid, name, lastname):
+    '''
+    funzione per aggiungere il chat di un utente sulla tabella nel DB concerteaux
+    '''
+    
+    conn1 = psycopg2.connect(host=p.ip, dbname=p.db, user=p.user, password=p.pwd, port=p.port)
+    conn1.set_session(autocommit=True)
+    cur1 = conn1.cursor()
+    logging.debug('connesso al DB')
+    query='INSERT INTO concerteaux.telegram_utenti(telegram_id, nome, true) VALUES (\'{}\', \'{} {}\',,\'t\');'.format(cid,lastname,name)
+    logging.debug(query)
+    try:
+        cur1.execute(query)
+        
+    except Exception as e:
+        logging.warning(e)
+        query= '''
+        UPDATE concerteaux.telegram_utenti SET nome=\'{} {}\', valido ='t' 
+        WHERE telegram_id=\'{}\';'''.format(lastname,name,cid)
+        cur1.execute(query)
+    cur1.close()
+    conn1.close()
+
+
+
+
+def remove_utenti_tgr(cid, name, lastname):
+    '''
+    funzione per rimuovere il chat di un utente sulla tabella nel DB concerteaux
+    '''
+    
+    conn1 = psycopg2.connect(host=p.ip, dbname=p.db, user=p.user, password=p.pwd, port=p.port)
+    conn1.set_session(autocommit=True)
+    cur1 = conn1.cursor()
+    logging.debug('connesso al DB')
+    query='INSERT INTO concerteaux.telegram_utenti(telegram_id, nome, valido) VALUES (\'{}\', \'{} {}\',\'f\');'.format(cid,lastname,name)
+    logging.debug(query)
+    try:
+        cur1.execute(query)
+        
+    except Exception as e:
+        logging.warning(e)
+        query= '''
+        UPDATE concerteaux.telegram_utenti SET nome=\'{} {}\', valido ='f' 
+        WHERE telegram_id=\'{}\';'''.format(lastname,name,cid)
+        cur1.execute(query)
+    cur1.close()
+    conn1.close()
+
+
+
 # questa classe usa il ChatHandler telepot.aio.helper.ChatHandler (ossia è in ascolto della chat del BOT)
 class MessageCounter(telepot.aio.helper.ChatHandler):
     def __init__(self, *args, **kwargs):
@@ -151,16 +203,22 @@ class MessageCounter(telepot.aio.helper.ChatHandler):
         is_bot = msg["from"]["is_bot"]
         if is_bot=='True':
             await self.sender.sendMessage("ERROR: questo Bot non risponde ad altri bot!")
-        elif command == '/telegram_id':
-            message = '''Gentile {1} {2} il tuo codice (telegram id) da comunicare a Gter srl è {3}. 
-Per maggiori informazioni contatta l'Ing. Lorenzo Benvenuto'''.format(self._count,nome, cognome, chat_id)
+        elif command == '/iscriviti':
+            update_utenti_tgr(chat_id,nome,cognome)
+            message = '''Gentile {1} {2} ora riceverai le notifiche circa lo stato delle stazioni. 
+Per maggiori informazioni contatta l'Ing. Lorenzo Benvenuto (Gter srl)'''.format(self._count,nome, cognome, chat_id)
             await self.sender.sendMessage(message)
+        elif command == '/disiscriviti':
+            remove_utenti_tgr(chat_id,nome,cognome)
+            message = '''Gentile {1} {2} ora non riceverai più le notifiche circa lo stato delle stazioni. Puoi reiscriverti al servizio con il comando /iscriviti 
+Per maggiori informazioni contatta l'Ing. Lorenzo Benvenuto (Gter srl)'''.format(self._count,nome, cognome, chat_id)
+            await self.sender.sendMessage(message)     
         elif command == '/webgis':
             message = "Gentile {1} {2} il link al webGIS di Concerteaux è {3} ".format(self._count,nome, cognome, link)
             await self.sender.sendMessage(message)
         elif command == '/stato_stazioni':
-            sent = '''Gentile {0} {1} il controllo delle stazioni è in corso,
-attendi alcuni istanti e ne riceverai l'esito '''.format(nome, cognome)
+            sent = '''{0} - Gentile {1} {2} il controllo delle stazioni è in corso,
+attendi alcuni istanti e ne riceverai l'esito '''.format(self._count,nome, cognome)
             logging.info(sent)
             await self.sender.sendMessage(sent)
             testo = stato_stazioni()
@@ -174,7 +232,8 @@ attendi alcuni istanti e ne riceverai l'esito '''.format(nome, cognome)
                              #[InlineKeyboardButton(text='Sito Gter', callback_data='info')],
                              #[InlineKeyboardButton(text='Demo Comunicazione', callback_data='demo_com')],
                              [InlineKeyboardButton(text='Link a webGIS Concerteaux', callback_data='sito')],
-                             [InlineKeyboardButton(text='Recupera il tuo Telegram ID', callback_data='chat_id')],
+                             [InlineKeyboardButton(text='Iscriviti alle notifiche', callback_data='chat_id')],
+                             [InlineKeyboardButton(text='Disiscriviti dalle notifiche', callback_data='chat_id_no')],
                              [InlineKeyboardButton(text='Verifica lo stato delle stazioni', callback_data='stazioni')],
                              #[InlineKeyboardButton(text='Time', callback_data='time')],
                          ])
@@ -218,13 +277,22 @@ class Quizzer(telepot.aio.helper.CallbackQueryOriginHandler):
 
 
     async  def _chatid(self):
-        sent = '''Gentile {1} {2} il tuo codice (telegram id) da comunicare a Gter srl è {0}
+        update_utenti_tgr(self.chat_id,self.nome,self.cognome)
+        sent = '''Gentile {1} {2} da ora riceverai le notifiche sullo stato delle stazioni
 Per maggiori informazioni contatta l'Ing. Lorenzo Benvenuto'''.format(self.chat_id,self.nome, self.cognome)
         logging.info(sent)
         logging.info(check)
         await self.editor.editMessageText(sent)
         
     
+    async  def _chatid_no(self):
+        remove_utenti_tgr(self.chat_id,self.nome,self.cognome)
+        sent = '''Gentile {1} {2} da ora non riceverai più le notifiche sullo stato delle stazioni. Puoi reiscriverti al servizio con il comando /iscriviti
+Per maggiori informazioni contatta l'Ing. Lorenzo Benvenuto'''.format(self.chat_id,self.nome, self.cognome)
+        logging.info(sent)
+        logging.info(check)
+        await self.editor.editMessageText(sent)
+        
     
     async  def _webGIS(self):
         sent = "Gentile {0} {1} il link al webGIS di Concerteaux è {2} ".format(self.nome, self.cognome, link)
@@ -278,15 +346,21 @@ attendi alcuni istanti e ne riceverai l'esito '''.format(self.nome, self.cognome
             #await self.sender.sendMessage(message)
         elif query_data == 'chat_id':
             #message = "Gentile {1} {2} il tuo codice (telegram id) da inserire nell'applicazione è {3}".format(self._count,nome, cognome, chat_id)
-            logging.info('Definire la chat_id')
+            logging.info('Iscritto tramite chat_id')
             #chiamo la funzione chat_id
             logging.info(self.chat_id)
             self._answer = await self._chatid()
+        elif query_data == 'chat_id_no':
+            #message = "Gentile {1} {2} il tuo codice (telegram id) da inserire nell'applicazione è {3}".format(self._count,nome, cognome, chat_id)
+            logging.info('Disiscritto tramite chat_id')
+            #chiamo la funzione chat_id
+            logging.info(self.chat_id)
+            self._answer = await self._chatid_no()
         elif query_data == 'sito':
             logging.info('ho effettivamente schiacciato il bottone sito')
             self._answer = await self._webGIS()
         elif query_data == 'stazioni':
-            logging.info('ho effettivamente schiacciato il bottone sito')
+            logging.info('ho effettivamente schiacciato il bottone stazioni')
             self._answer = await self._stato_stazioni()
     
 
