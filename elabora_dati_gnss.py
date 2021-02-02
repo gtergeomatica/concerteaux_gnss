@@ -194,7 +194,7 @@ def uploadZTDtoDB(goGPSproject,connection_param,table,year,doy):
             print('error: ',e)
     cur.close()
     conn.close()
-    print ('ZTD values for stations ',ztd_station_name,' ,for year {:04d} day {:03d}, correctly uploaded to database!'.format(year,doy) )
+    print ('ZTD values for stations ',ztd_station_name,', for year {:04d} day {:03d}, correctly uploaded to database!'.format(year,doy) )
     #rimuovo cartella con risultati elaborazione?
     os.system('rm -r {}'.format(out_path))
     print('ZTD output files (.csv) removed locally!')
@@ -286,29 +286,28 @@ goGPSpath='/home/gter/REPOSITORY/goGPS_MATLAB_git'
 goGPSproject='{}/ZTD_elaborations'.format(os.path.dirname(os.path.realpath(__file__)))
 
 
-# Carico i dati rinex (da spostare dopo)
+
 rinex_folder=os.listdir('{}/RINEX'.format(goGPSproject))
 #giorno=datetime.now()
 #anno='{}'.format(giorno.year)
 year=datetime.utcnow().utctimetuple().tm_year
 day_of_year = datetime.utcnow().utctimetuple().tm_yday
-ystd=day_of_year-1
-start_time='{:04d}{:03d}'.format(year,ystd) #questo perche il rinex completo lo si ha solo del giorno precedente
+day_to_process=day_of_year-5 #5
+start_time='{:04d}{:03d}'.format(year,day_to_process) 
 #print(start_time)
 #sys.exit()
+print('Check RINEX file for day {:03d} of year {:04d}:'.format(day_to_process,year))
 for i in rinex_folder:
     #out_subfolder=i[0:4]
     if i[12:19] == start_time:
         print(i)
-        upload2ftpserver('{}/RINEX'.format(goGPSproject),'/www.gter.it/concerteaux_gnss/rawdata/{}'.format(i[0:4]),i)
-#sys.exit()
-
-
+        #togliere commento se goGPS non funziona
+        #upload2ftpserver('{}/RINEX'.format(goGPSproject),'/www.gter.it/concerteaux_gnss/rawdata/{}'.format(i[0:4]),i) 
 
 conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
 conn.set_session(autocommit=True)
 cur = conn.cursor()
-query= "SELECT cod FROM concerteaux.stazioni_lowcost WHERE operativa=True"
+query= "SELECT cod FROM concerteaux.stazioni_lowcost WHERE operativa=True" #Lorenzo: non mi ricordo il motivo di questa query
 try:
     cur.execute(query)
 except Exception as e:
@@ -318,7 +317,7 @@ Stazioni=[i[0] for i in cur.fetchall()]
 cur.close()
 conn.close()
 
-print(Stazioni)
+#print(Stazioni)
 
 connection=[ip,db,user,pwd,port]  
 
@@ -331,13 +330,13 @@ year=datetime.utcnow().utctimetuple().tm_year
 
 starting_time=str(year)+str(day_of_year)+'0000'
 
-day_to_process=day_of_year-5
+#day_to_process=day_of_year-6
 #day_to_process=274
 
 
 #uploadZTDtoDB(goGPSproject, connection,'ztd_bendola',year,day_to_process)
 
-print('Processing dei dati del giorno: {}, anno: {}'.format(day_to_process,year))
+print('\nProcessing dei dati del giorno: {}, anno: {}'.format(day_to_process,year))
 
 
 
@@ -372,6 +371,19 @@ if os.path.exists(goGPSproject+'/out/{:04d}/{:03d}'.format(year,day_to_process))
 
     # Carico i dati elaborati sul DB e li rimuovo dalla cartella locale
     uploadZTDtoDB(goGPSproject, connection,'ztd_bendola',year,day_to_process)
+
+    #Carico i dati rinex su server ftp
+    print('Uplaoding RINEX data to server:')
+    for i in rinex_folder:
+        if i[12:19] == start_time:          
+            upload2ftpserver('{}/RINEX'.format(goGPSproject),'/www.gter.it/concerteaux_gnss/rawdata/{}'.format(i[0:4]),i)
+            print(i, ' done!')
+    print('Removing RINEX data locally:')
+    for i in rinex_folder:
+        if i[12:19] == start_time:          
+            os.system('rm {}/RINEX/{}'.format(goGPSproject,i))
+            print(i, ' done!')
+
 
     
 else:
