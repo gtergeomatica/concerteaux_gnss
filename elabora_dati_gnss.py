@@ -13,6 +13,20 @@ import scarica_dati
 from ftplib import FTP_TLS
 
 
+import logging
+#import tempfile
+
+#tmpfolder=tempfile.gettempdir() # get the current temporary directory
+logfile='{}/ztd_elaboration_log/ztd_elaboration_{:04d}_{:02d}_{:02d}_{:02d}_{:02d}.log'.format(os.path.dirname(os.path.realpath(__file__)),datetime.now().year,datetime.now().month,datetime.now().day,datetime.now().hour,datetime.now().minute)
+
+if os.path.exists(logfile):
+    os.remove(logfile)
+
+logging.basicConfig(format='%(asctime)s\t%(levelname)s\t%(message)s',
+    filename=logfile,
+    level=logging.DEBUG)
+
+
 def getObsIGS(station,year,doy):
     '''
     Function to get RINEX file from IGS
@@ -56,7 +70,7 @@ def modifyINIfile(goGPSproject,doy,anno):
     with open('{}/config/elab_partenza_new.ini'.format(goGPSproject), 'r') as configfile:
         oldfilelines=configfile.readlines()
 
-    print(oldfilelines[49][0:14])
+    #print(oldfilelines[49][0:14])
  
     for i in oldfilelines:
     
@@ -132,7 +146,7 @@ def readData(path,filename):
         return dati
        
     except Exception as e:
-        print('Error: {}'.format(e))
+        logging.warning('Error: {}'.format(e))
         return
 
 
@@ -186,18 +200,18 @@ def uploadZTDtoDB(goGPSproject,connection_param,table,year,doy):
                 cur.execute(query1)
                                 
             except Exception as e:
-                print('error: ',e)
+                logging.warning('error: {}'.format(e))
         query2='INSERT INTO meteognss_ztd.log_ztd_elaborations(id_station, year, doy, processed) VALUES (\'{}\', {}, {}, True)'.format(s,year,doy)
         try:
             cur.execute(query2)
         except Exception as e:
-            print('error: ',e)
+            logging.warning('error: {}'.format(e))
     cur.close()
     conn.close()
-    print ('ZTD values for stations ',ztd_station_name,', for year {:04d} day {:03d}, correctly uploaded to database!'.format(year,doy) )
+    logging.info('ZTD values for stations {}, for year {:04d} day {:03d}, correctly uploaded to database!'.format(ztd_station_name,year,doy) )
     #rimuovo cartella con risultati elaborazione?
     os.system('rm -r {}'.format(out_path))
-    print('ZTD output files (.csv) removed locally!')
+    logging.info('ZTD output files (.csv) removed locally!')
     
 
 
@@ -234,7 +248,7 @@ def doy2weeksday(doy, year):
 
     #print(type(date(year,datamy.month,datamy.day)))
     pippo=date2gpswd(date(year,datamy.month,datamy.day))
-    print(pippo)
+    #print(pippo)
 
 
 def rmEphemerides (goGPSpath, doy,year):
@@ -248,7 +262,7 @@ def rmEphemerides (goGPSpath, doy,year):
     if os.path.exists(eph_path):
         os.system('rm -r {}'.format(eph_path))
     else:
-        print(eph_path+' does not exist')
+        logging.warning('{} does not exist'.format(eph_path))
 
 def rmCLK (goGPSpath, doy,year):
     
@@ -261,7 +275,7 @@ def rmCLK (goGPSpath, doy,year):
     if os.path.exists(clk_path):
         os.system('rm -r {}'.format(clk_path))
     else:
-        print(clk_path+' does not exist')    
+        logging.warning('{} does not exist'.format(clk_path))    
 
 
 def upload2ftpserver(local_folder, remote_folder, file):
@@ -283,52 +297,43 @@ def upload2ftpserver(local_folder, remote_folder, file):
 #### MAIN ####
 
 goGPSpath='/home/gter/REPOSITORY/goGPS_MATLAB_git'
-goGPSproject='{}/ZTD_elaborations'.format(os.path.dirname(os.path.realpath(__file__)))
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+goGPSproject_name='ZTD_elaborations'
+goGPSproject='{}/{}'.format(os.path.dirname(os.path.realpath(__file__)),goGPSproject_name)
 
 
 
 rinex_folder=os.listdir('{}/RINEX'.format(goGPSproject))
-#giorno=datetime.now()
-#anno='{}'.format(giorno.year)
+
 year=datetime.utcnow().utctimetuple().tm_year
 day_of_year = datetime.utcnow().utctimetuple().tm_yday
 day_to_process=day_of_year-5 #5
+
+'''
+year=2020
+day_to_process=int(sys.argv[1])
+'''
+
 start_time='{:04d}{:03d}'.format(year,day_to_process) 
-#print(start_time)
-#sys.exit()
-print('Check RINEX file for day {:03d} of year {:04d}:'.format(day_to_process,year))
-for i in rinex_folder:
+
+
+rinex_check=[i[12:19] for i in rinex_folder if i[12:19] == start_time]
+#for i in rinex_folder:
     #out_subfolder=i[0:4]
-    if i[12:19] == start_time:
-        print(i)
-        #togliere commento se goGPS non funziona
-        #upload2ftpserver('{}/RINEX'.format(goGPSproject),'/www.gter.it/concerteaux_gnss/rawdata/{}'.format(i[0:4]),i) 
-
-conn = psycopg2.connect(host=ip, dbname=db, user=user, password=pwd, port=port)
-conn.set_session(autocommit=True)
-cur = conn.cursor()
-query= "SELECT cod FROM concerteaux.stazioni_lowcost WHERE operativa=True" #Lorenzo: non mi ricordo il motivo di questa query
-try:
-    cur.execute(query)
-except Exception as e:
-    print('errore: ',e)
-Stazioni=[i[0] for i in cur.fetchall()] 
-
-cur.close()
-conn.close()
-
-#print(Stazioni)
+    #if i[12:19] == start_time:
+        #logging.info(i)
+        #rinex_check.append(i)
 
 connection=[ip,db,user,pwd,port]  
 
-now=datetime.now()
-dir_path = os.path.dirname(os.path.realpath(__file__))
+#now=datetime.now()
 GPS_START_DATE = date(1980, 1, 6)
-day_of_year = datetime.utcnow().utctimetuple().tm_yday
-year=datetime.utcnow().utctimetuple().tm_year
+#day_of_year = datetime.utcnow().utctimetuple().tm_yday
+#year=datetime.utcnow().utctimetuple().tm_year
 
 
-starting_time=str(year)+str(day_of_year)+'0000'
+#starting_time=str(year)+str(day_of_year)+'0000'
 
 #day_to_process=day_of_year-6
 #day_to_process=274
@@ -336,59 +341,75 @@ starting_time=str(year)+str(day_of_year)+'0000'
 
 #uploadZTDtoDB(goGPSproject, connection,'ztd_bendola',year,day_to_process)
 
-print('\nProcessing dei dati del giorno: {}, anno: {}'.format(day_to_process,year))
 
 
 
 
-new_ini_file=modifyINIfile(goGPSproject,day_to_process,year)
-
-launchgoGPS(goGPSpath,new_ini_file)
-#controllo stato della soluzione
-
-#print(os.path.exists(goGPSproject+'/out/{:04d}/{:03d}'.format(year,day_to_process)))
-
-if os.path.exists(goGPSproject+'/out/{:04d}/{:03d}'.format(year,day_to_process)):
-    #qualcosa è stato prodotto come output
-    #rimuovo le effemeridi, i file CLK, ERP
-    rmEphemerides(goGPSpath, day_to_process,year)
-    print('Epeherides correctly removed!')
-    rmCLK(goGPSpath, day_to_process,year)
-    print('Clock file correctly removed!')
-    #sposto il log su aruba 
-    logs=os.listdir('{}/out/log'.format(goGPSproject))
-    logs.sort() # list of logs file sorted from the elder to the newer (based on filenames)
-    upload2ftpserver('{}/out/log'.format(goGPSproject),'/www.gter.it/concerteaux_gnss/ztd_elaborations/log',logs[-1])
-    os.system('rm {}/out/log/{}'.format(goGPSproject, logs[-1]))
-    print('Elaboration log file, called {} removed locally and uploaded to server!'.format(logs[-1]))
-    #rimuovo i RINEX
-
-    # Carico i dati elaborati in formato CSV sul aruba
-    elab=os.listdir('{}/out/{:04d}/{:03d}'.format(goGPSproject, year,day_to_process))
-    for i in elab:
-        upload2ftpserver('{}/out/{:04d}/{:03d}'.format(goGPSproject, year,day_to_process),'/www.gter.it/concerteaux_gnss/ztd_elaborations/output',i)
-    print('ZTD output files (.csv) uploaded to server')
-
-    # Carico i dati elaborati sul DB e li rimuovo dalla cartella locale
-    uploadZTDtoDB(goGPSproject, connection,'ztd_bendola',year,day_to_process)
-
-    #Carico i dati rinex su server ftp
-    print('Uplaoding RINEX data to server:')
-    for i in rinex_folder:
-        if i[12:19] == start_time:          
-            upload2ftpserver('{}/RINEX'.format(goGPSproject),'/www.gter.it/concerteaux_gnss/rawdata/{}'.format(i[0:4]),i)
-            print(i, ' done!')
-    print('Removing RINEX data locally:')
-    for i in rinex_folder:
-        if i[12:19] == start_time:          
-            os.system('rm {}/RINEX/{}'.format(goGPSproject,i))
-            print(i, ' done!')
+logging.info('Data processing of DOY: {}, YEAR: {}'.format(day_to_process,year))
 
 
-    
+
+if len(rinex_check)==0:
+    logging.warning('Input file RINEX not present,the processing is not executed!')
+    sys.exit()
 else:
-    #print('case to be implemented')
-    print('Check 1: Esiste il percorso alla cartella di output? ',os.path.exists(goGPSproject+'/out/{:04d}/{:03d}'.format(year,day_to_process)))
+    logging.info('Present RINEX files for day {:03d} of year {:04d}:'.format(day_to_process,year))
+
+    for i in rinex_check:
+        logging.info(i)
+
+
+    new_ini_file=modifyINIfile(goGPSproject,day_to_process,year)
+
+    logging.info('Starting goGPS elaboration, check the log file goGPS_run_{}_{:04d}{:02d}{:02d}_{:02d}{:02d}{:02d}.log, in the folder /out/log folder, or in the remote server'.format(goGPSproject_name, datetime.now().year,datetime.now().month,datetime.now().day,datetime.now().hour,datetime.now().minute,datetime.now().second))
+
+    launchgoGPS(goGPSpath,new_ini_file)
+    #controllo stato della soluzione
+
+    #print(os.path.exists(goGPSproject+'/out/{:04d}/{:03d}'.format(year,day_to_process)))
+
+    if os.path.exists(goGPSproject+'/out/{:04d}/{:03d}'.format(year,day_to_process)):
+        #qualcosa è stato prodotto come output
+        #rimuovo le effemeridi, i file CLK, ERP
+        rmEphemerides(goGPSpath, day_to_process,year)
+        logging.info('Epeherides correctly removed!')
+        rmCLK(goGPSpath, day_to_process,year)
+        logging.info('Clock file correctly removed!')
+        #sposto il log su aruba 
+        logs=os.listdir('{}/out/log'.format(goGPSproject))
+        logs.sort() # list of logs file sorted from the elder to the newer (based on filenames)
+        upload2ftpserver('{}/out/log'.format(goGPSproject),'/www.gter.it/concerteaux_gnss/ztd_elaborations/log',logs[-1])
+        os.system('rm {}/out/log/{}'.format(goGPSproject, logs[-1]))
+        logging.info('Elaboration log file, called {} removed locally and uploaded to server!'.format(logs[-1]))
+        #rimuovo i RINEX
+
+        # Carico i dati elaborati in formato CSV sul aruba
+        elab=os.listdir('{}/out/{:04d}/{:03d}'.format(goGPSproject, year,day_to_process))
+        for i in elab:
+            upload2ftpserver('{}/out/{:04d}/{:03d}'.format(goGPSproject, year,day_to_process),'/www.gter.it/concerteaux_gnss/ztd_elaborations/output',i)
+        logging.info('ZTD output files (.csv) uploaded to server')
+
+        # Carico i dati elaborati sul DB e li rimuovo dalla cartella locale
+        uploadZTDtoDB(goGPSproject, connection,'ztd_bendola',year,day_to_process)
+
+        #Carico i dati rinex su server ftp
+        logging.info('Uplaoding RINEX data to server:')
+        for i in rinex_folder:
+            if i[12:19] == start_time:          
+                upload2ftpserver('{}/RINEX'.format(goGPSproject),'/www.gter.it/concerteaux_gnss/rawdata/{}'.format(i[0:4]),i)
+                logging.info('{} done!'.format(i))
+        logging.info('Removing RINEX data locally:')
+        for i in rinex_folder:
+            if i[12:19] == start_time:          
+                os.system('rm {}/RINEX/{}'.format(goGPSproject,i))
+                logging.info('{} done!'.format(i))
+
+
+        
+    else:
+        #print('case to be implemented')
+        messaggio='Check 1: Has the output folder been created? {}'.format(os.path.exists(goGPSproject+'/out/{:04d}/{:03d}'.format(year,day_to_process)))
+        logging.warning(messaggio)
 
 
 
