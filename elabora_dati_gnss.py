@@ -93,7 +93,10 @@ def modifyINIfile(goGPSproject,doy,anno):
     
     project_conf='{}/config/'.format(goGPSproject) #use absolute path
     newINIfile='elab_{}_{}.ini'.format(anno,doy)
-    
+
+    if os.path.exists('{}{}'.format(project_conf,newINIfile)):
+        os.remove('{}{}'.format(project_conf,newINIfile))
+
     with open ('{}{}'.format(project_conf,newINIfile),'a') as newfile:
         for line in newINIfilelines:
             newfile.write(line)
@@ -113,14 +116,14 @@ def launchgoGPS(goGPSpath,inifile):
     After the exection of goGPS the function eleminates the matlab scritp
     '''
     
-    with open ('launch_goGPStemp.m','a') as setfile:
+    with open ('/tmp/launch_goGPStemp.m','a') as setfile:
         setfile.write('clear all\nclose all\n')
         setfile.write('cd {}/goGPS\n'.format(goGPSpath))
         setfile.write('goGPS(\'{}\',0);\n'.format(inifile))
         setfile.write('exit')       
         
-    os.system('matlab -r launch_goGPStemp')
-    os.system('rm launch_goGPStemp.m')
+    os.system('matlab -r "run(\'/tmp/launch_goGPStemp.m\')";')
+    os.system('rm /tmp/launch_goGPStemp.m')
     
         
 def readData(path,filename):
@@ -308,12 +311,12 @@ rinex_folder=os.listdir('{}/RINEX'.format(goGPSproject))
 
 year=datetime.utcnow().utctimetuple().tm_year
 day_of_year = datetime.utcnow().utctimetuple().tm_yday
-day_to_process=day_of_year-5 #5
+day_to_process=day_of_year-6 #5
 
-'''
-year=2020
-day_to_process=int(sys.argv[1])
-'''
+
+#year=2020
+#day_to_process=int(sys.argv[1])
+
 
 start_time='{:04d}{:03d}'.format(year,day_to_process) 
 
@@ -361,7 +364,7 @@ else:
 
     new_ini_file=modifyINIfile(goGPSproject,day_to_process,year)
 
-    logging.info('Starting goGPS elaboration, check the log file goGPS_run_{}_{:04d}{:02d}{:02d}_{:02d}{:02d}{:02d}.log, in the folder /out/log folder, or in the remote server'.format(goGPSproject_name, datetime.now().year,datetime.now().month,datetime.now().day,datetime.now().hour,datetime.now().minute,datetime.now().second))
+    logging.info('Starting goGPS elaboration, check the log file goGPS_run_{}_{:04d}{:02d}{:02d}_{:02d}{:02d}XX.log, in the folder /out/log folder, or in the remote server'.format(goGPSproject_name, datetime.now().year,datetime.now().month,datetime.now().day,datetime.now().hour,datetime.now().minute))
 
     launchgoGPS(goGPSpath,new_ini_file)
     #controllo stato della soluzione
